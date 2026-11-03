@@ -121,10 +121,11 @@ window.SITE = {
 
     roles: [
       {
-        name: "Directors",
+        name: "Leads",
         description: "Set the direction for each game and keep the whole studio moving the same way.",
         open: false,
-        members: [
+        members: [ { name: "Ben", username: "bk_5550", title: "Owner" },
+    
           // { name: "Your name", username: "YourRobloxUsername", title: "Founder" },
         ]
       },
