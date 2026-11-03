@@ -1,1 +1,0 @@
-Put game screenshots in this folder, then list them in content.js. See EDITING.md.
