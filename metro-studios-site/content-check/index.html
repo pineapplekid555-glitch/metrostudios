@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Content check | Metro Studios</title>
+<link rel="icon" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,100..900&display=swap">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .chk{max-width:820px;margin:0 auto;padding:clamp(40px,7vw,96px) var(--gut) 96px}
+  .chk h1{font-weight:800;font-stretch:112%;font-size:clamp(2rem,5vw,3.4rem);line-height:1;letter-spacing:-.02em}
+  .chk .sub{margin-top:14px;color:var(--text-2)}
+  .verdict{margin-top:36px;padding:22px 24px;border:1.5px solid var(--line);border-radius:2px;display:flex;gap:16px;align-items:flex-start}
+  .verdict i{flex:none;width:14px;height:14px;margin-top:7px;border-radius:50%;background:var(--muted)}
+  .verdict b{display:block;font-size:1.25rem;line-height:1.3}
+  .verdict span{display:block;margin-top:4px;color:var(--text-2);font-size:15.5px}
+  .verdict.ok{border-color:#2f7a4d}.verdict.ok i{background:#46d37a}
+  .verdict.bad{border-color:#a8433f}.verdict.bad i{background:#e5534d}
+  .verdict.warn{border-color:#8a6d2b}.verdict.warn i{background:#e0b341}
+  .chk h2{margin-top:44px;font-size:13px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .chk ul{margin-top:12px;border-top:1px solid var(--line)}
+  .chk li{padding:13px 0 13px 20px;border-bottom:1px solid var(--line);position:relative;font-size:16px;line-height:1.5}
+  .chk li::before{content:"";position:absolute;left:0;top:21px;width:8px;height:8px;background:var(--muted)}
+  .chk li.err::before{background:#e5534d}.chk li.wrn::before{background:#e0b341}
+  .chk li small{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+  .chk code{font:500 .92em ui-monospace,Menlo,Consolas,monospace;background:#18181b;padding:2px 6px;border-radius:2px}
+  .sum li{padding-left:0}.sum li::before{display:none}
+  .sum b{display:inline-block;min-width:150px;font-weight:650}
+  .chk a{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="site theme-home">
+<main class="chk">
+  <h1>Content check</h1>
+  <p class="sub">Checks <code>content.js</code> for typos and shows what the site will display. This page is not linked from the site.</p>
+  <div class="verdict" id="verdict"><i></i><div><b>Checking...</b><span>Loading content.js</span></div></div>
+  <div id="out"></div>
+  <p class="sub" style="margin-top:44px"><a href="../">Back to the site</a></p>
+</main>
+</div>
+<script>
+(function () {
+  var STATUS = { live: 'Out now', soon: 'Coming soon', testing: 'In testing', dev: 'In development' };
+  var SLUGS = { 'westbrook-county': 'Westbrook County', 'project-alba': 'Project Alba', 'oath-of-caledonia': 'Oath of Caledonia' };
+  var KEYS = {
+    top: ['links', 'games', 'news', 'team'],
+    links: ['discord', 'group'],
+    game: ['status', 'release', 'play', 'website', 'screenshots'],
+    shot: ['image', 'caption', 'alt'],
+    news: ['date', 'game', 'title', 'text', 'items', 'link'],
+    team: ['note', 'hiring', 'roles'],
+    role: ['name', 'description', 'open', 'members'],
+    member: ['name', 'username', 'title']
+  };
+  var problems = [], notes = [], pending = [], syntaxErr = null;
+  function bad(msg, hint) { problems.push({ l: 'err', m: msg, h: hint }); }
+  function warn(msg, hint) { problems.push({ l: 'wrn', m: msg, h: hint }); }
+  function isStr(x) { return typeof x === 'string'; }
+  function isPath(x) { return isStr(x) && x.trim() !== '' && !/^(javascript|data):/i.test(x.trim()); }
+  function resolve(p) { p = p.trim(); return /^(https?:|mailto:|#)/i.test(p) ? p : '../' + p.replace(/^\//, ''); }
+  function isUrl(x) { return isStr(x) && /^(https?:\/\/|\/|#|mailto:)/i.test(x.trim()); }
+  function keys(o, kind, where) {
+    Object.keys(o).forEach(function (k) {
+      if (KEYS[kind].indexOf(k) < 0) warn('Unknown field "' + k + '" in ' + where + '. It will be ignored.', 'Possible typo. Allowed here: ' + KEYS[kind].join(', ') + '.');
+    });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function validate(S) {
+    if (!S || typeof S !== 'object') { bad('content.js loaded, but it does not define window.SITE.', 'The file should start with window.SITE = { and end with };'); return; }
+    keys(S, 'top', 'the top level');
+
+    var L = S.links || {};
+    keys(L, 'links', 'links');
+    ['discord', 'group'].forEach(function (k) {
+      if (!L[k]) warn('links.' + k + ' is empty, so those buttons are hidden.');
+      else if (!isUrl(L[k])) bad('links.' + k + ' is not a web address.', 'It should start with https://');
+    });
+
+    var games = S.games || {};
+    Object.keys(games).forEach(function (k) { if (!SLUGS[k]) warn('Unknown game "' + k + '" in games. It will be ignored.', 'Games are: ' + Object.keys(SLUGS).join(', ') + '.'); });
+    Object.keys(SLUGS).forEach(function (slug) {
+      var g = games[slug];
+      if (!g) { warn('Game "' + slug + '" is missing from games. It will show as In development.'); return; }
+      var w = 'games["' + slug + '"]';
+      keys(g, 'game', w);
+      if (!STATUS[g.status]) bad(w + ' has status "' + g.status + '".', 'Use one of: live, soon, testing, dev.');
+      ['play', 'website'].forEach(function (k) { if (g[k] && !isUrl(g[k])) bad(w + '.' + k + ' is not a web address.', 'It should start with https://'); });
+      if (g.release != null && !isStr(g.release)) bad(w + '.release must be text in "quotes".');
+      if (g.status === 'live' && !g.play) warn(SLUGS[slug] + ' is marked live but has no play link.', 'Add its Roblox link as play: "https://..." so the Play button shows.');
+      if (g.screenshots != null && !Array.isArray(g.screenshots)) { bad(w + '.screenshots must be a list [ ... ].'); return; }
+      (g.screenshots || []).forEach(function (s, i) {
+        var p = typeof s === 'string' ? s : s && s.image;
+        if (s && typeof s === 'object') keys(s, 'shot', w + ' screenshot ' + (i + 1));
+        if (!isPath(p)) { bad(w + ' screenshot ' + (i + 1) + ' has no valid image path.', 'Example: image: "assets/img/screenshots/alba-1.jpg"'); return; }
+        pending.push(new Promise(function (done) {
+          var im = new Image();
+          im.onload = done;
+          im.onerror = function () { bad('Screenshot not found: ' + p, 'Check the file name (capital letters matter) and that it was uploaded to that folder.'); done(); };
+          im.src = resolve(p);
+        }));
+      });
+    });
+
+    if (S.news != null && !Array.isArray(S.news)) bad('news must be a list [ ... ].');
+    (Array.isArray(S.news) ? S.news : []).forEach(function (n, i) {
+      var w = 'News post ' + (i + 1) + (n && n.title ? ' ("' + n.title + '")' : '');
+      if (!n || typeof n !== 'object') { bad(w + ' is not a { ... } block.'); return; }
+      keys(n, 'news', w);
+      if (!isStr(n.title) || !n.title.trim()) bad(w + ' has no title.', 'Posts without a title are not shown.');
+      if (n.date && !/^\d{4}-\d{2}-\d{2}$/.test(n.date)) warn(w + ' has the date "' + n.date + '".', 'Write dates as year-month-day, like "2026-10-12", so they sort correctly.');
+      if (!n.date) warn(w + ' has no date.', 'It will sort to the bottom.');
+      if (n.game && !SLUGS[n.game]) bad(w + ' has game "' + n.game + '".', 'Use one of: ' + Object.keys(SLUGS).join(', ') + ', or "" for studio-wide news.');
+      if (n.items != null && (!Array.isArray(n.items) || n.items.some(function (x) { return !isStr(x); }))) bad(w + ': items must be a list of text in "quotes".');
+      if (n.link && !isPath(n.link)) bad(w + ': link is not valid.', 'Use a web address starting with https://');
+      if (!n.items && !n.text) warn(w + ' has no items or text.');
+    });
+
+    var T = S.team || {};
+    keys(T, 'team', 'team');
+    if (T.roles != null && !Array.isArray(T.roles)) bad('team.roles must be a list [ ... ].');
+    var members = 0, open = 0;
+    (Array.isArray(T.roles) ? T.roles : []).forEach(function (r, i) {
+      var w = 'Role ' + (i + 1) + (r && r.name ? ' ("' + r.name + '")' : '');
+      if (!r || typeof r !== 'object') { bad(w + ' is not a { ... } block.'); return; }
+      keys(r, 'role', w);
+      if (!isStr(r.name) || !r.name.trim()) bad(w + ' has no name.', 'Roles without a name are not shown.');
+      if (r.open === true) open++;
+      if (r.open != null && typeof r.open !== 'boolean') bad(w + ': open must be true or false, without quotes.');
+      if (r.members != null && !Array.isArray(r.members)) { bad(w + ': members must be a list [ ... ].'); return; }
+      (r.members || []).forEach(function (m, j) {
+        var mw = w + ', person ' + (j + 1);
+        if (typeof m === 'string') { if (m.trim()) members++; else warn(mw + ' is empty.'); return; }
+        if (!m || typeof m !== 'object') { bad(mw + ' should be a name in "quotes" or a { name: "..." } block.'); return; }
+        keys(m, 'member', mw);
+        if (!isStr(m.name) || !m.name.trim()) bad(mw + ' has no name.', 'People without a name are not shown.');
+        else members++;
+        if (m.username && /\s/.test(m.username)) warn(mw + ': username "' + m.username + '" contains a space.', 'Roblox usernames have no spaces.');
+      });
+    });
+
+    var shotsN = 0;
+    Object.keys(SLUGS).forEach(function (s) { shotsN += ((games[s] || {}).screenshots || []).length; });
+    notes.push(['Games', Object.keys(SLUGS).map(function (s) { var g = games[s] || {}; return SLUGS[s] + ': ' + (STATUS[g.status] || '?') + (g.release && g.status !== 'live' ? ' (' + g.release + ')' : ''); }).join('  /  ')]);
+    notes.push(['Team', (Array.isArray(T.roles) ? T.roles.length : 0) + ' roles, ' + members + ' people, ' + open + ' recruiting']);
+    notes.push(['News', (Array.isArray(S.news) ? S.news.length : 0) + ' posts']);
+    notes.push(['Screenshots', shotsN + ' in total']);
+  }
+
+  function show() {
+    var errs = problems.filter(function (p) { return p.l === 'err'; }).length;
+    var v = document.getElementById('verdict');
+    var head, sub, cls;
+    if (syntaxErr) { cls = 'bad'; head = 'content.js has a typo'; sub = 'The site is showing its last saved version until this is fixed.'; }
+    else if (errs) { cls = 'bad'; head = errs + (errs === 1 ? ' problem' : ' problems') + ' to fix'; sub = 'The site will still load, but the parts below will not show as intended.'; }
+    else if (problems.length) { cls = 'warn'; head = 'Looks fine, with ' + problems.length + (problems.length === 1 ? ' note' : ' notes'); sub = 'Nothing is broken. These are worth a look.'; }
+    else { cls = 'ok'; head = 'All good'; sub = 'content.js is valid and every screenshot was found.'; }
+    v.className = 'verdict ' + cls;
+    v.querySelector('b').textContent = head;
+    v.querySelector('span').textContent = sub;
+    var h = '';
+    if (problems.length) {
+      h += '<h2>' + (syntaxErr ? 'What went wrong' : 'To look at') + '</h2><ul>' + problems.map(function (p) {
+        return '<li class="' + p.l + '">' + esc(p.m) + (p.h ? '<small>' + esc(p.h) + '</small>' : '') + '</li>';
+      }).join('') + '</ul>';
+    }
+    if (notes.length) {
+      h += '<h2>What the site will show</h2><ul class="sum">' + notes.map(function (n) { return '<li><b>' + esc(n[0]) + '</b> ' + esc(n[1]) + '</li>'; }).join('') + '</ul>';
+    }
+    document.getElementById('out').innerHTML = h;
+  }
+
+  window.addEventListener('error', function (e) {
+    if (e.filename && /content\.js/.test(e.filename)) syntaxErr = e;
+  });
+
+  var s = document.createElement('script');
+  s.src = '../content.js?check=' + Date.now();
+  s.onload = function () {
+    if (syntaxErr) return fail();
+    try { validate(window.SITE); } catch (err) { bad('Could not read content.js: ' + err.message); }
+    Promise.all(pending).then(show);
+  };
+  s.onerror = function () {
+    if (syntaxErr) return fail();
+    bad('Could not load content.js.', 'Check that the file is uploaded next to index.html and is called exactly content.js.');
+    show();
+  };
+  function fail() {
+    var m = syntaxErr.message || 'Unknown error';
+    problems.push({ l: 'err', m: 'Line ' + (syntaxErr.lineno || '?') + ': ' + m, h: 'Usually a missing comma, quote or bracket on that line or the line above it.' });
+    fetch('../content.js?check=' + Date.now()).then(function (r) { return r.text(); }).then(function (t) {
+      t = t.replace(/\/\*[\s\S]*?\*\//g, function (m) { return m.replace(/[^\n]/g, ' '); });
+      var lines = t.split('\n'), curly = [];
+      lines.forEach(function (ln, i) { if (/[“”‘’]/.test(ln) && !/^\s*(\/\/|\*|\/\*)/.test(ln)) curly.push(i + 1); });
+      if (curly.length) problems.push({ l: 'err', m: 'Curly quotes found on line' + (curly.length > 1 ? 's ' : ' ') + curly.slice(0, 8).join(', '), h: 'Replace them with straight quotes ("). Word processors swap these in automatically.' });
+      show();
+    }).catch(show);
+  }
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
