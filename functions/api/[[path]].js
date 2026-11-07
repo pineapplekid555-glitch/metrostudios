@@ -104,7 +104,7 @@ async function listAll(env, prefix) {
   return out;
 }
 
-export async function onRequest({ request, env }) {
+async function handle({ request, env }) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean);
   const method = request.method;
@@ -491,4 +491,13 @@ export async function onRequest({ request, env }) {
     }
   }
   return fail("Not found.", 404);
+}
+
+// Any unexpected failure comes back as readable JSON instead of a blank error page.
+export async function onRequest(ctx) {
+  try {
+    return await handle(ctx);
+  } catch (e) {
+    return json({ error: "Server error: " + String((e && e.message) || e).slice(0, 300) }, 500);
+  }
 }
