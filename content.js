@@ -124,9 +124,9 @@ window.SITE = {
         name: "Leads",
         description: "Set the direction for each game and keep the whole studio moving the same way.",
         open: false,
-        members: [ { name: "Ben", username: "bk_5550", title: "Owner" },
-    
-          // { name: "Your name", username: "YourRobloxUsername", title: "Founder" },
+        members: [
+          { name: "Ben", username: "pineapplekid555", title: "Owner and game lead" },
+          { name: "Sonny", username: "muirs2501", title: "Game lead" }
         ]
       },
       {

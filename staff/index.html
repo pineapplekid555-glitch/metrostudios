@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Staff | Metro Studios</title><meta name="robots" content="noindex"><meta name="theme-color" content="#0a0a0b">
+<link rel="icon" href="../favicon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,100..900&display=swap">
+<style>
+:root{--bg:#0a0a0b;--panel:#141416;--line:#26262a;--tx:#ececec;--mut:#8d8d95;--ac:#f2f2f2;--red:#e5484d;--grn:#46a758;--amb:#f5a524}
+@media(prefers-color-scheme:light){:root{--bg:#f6f6f4;--panel:#fff;--line:#dcdcd8;--tx:#121211;--mut:#6a6a70;--ac:#121211}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.5 Archivo,system-ui,sans-serif;padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+a{color:inherit}.wrap{max-width:1100px;margin:0 auto;padding:0 18px}
+header{border-bottom:1px solid var(--line)}header .wrap{display:flex;align-items:center;gap:14px;height:60px}
+header b{letter-spacing:.02em}header .sp{flex:1}.who{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:13px}.who img{width:26px;height:26px;border-radius:50%}
+h1{font-size:1.6rem;margin:26px 0 4px}h2{font-size:1.05rem;margin:0 0 10px}.mut{color:var(--mut)}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;margin:18px 0;border-bottom:1px solid var(--line)}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);padding:10px 14px;font:inherit;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected=true]{color:var(--tx);border-color:var(--ac)}
+.btn{background:var(--ac);color:var(--bg);border:0;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.btn.line{background:none;color:var(--tx);border:1px solid var(--line)}.btn.sm{padding:4px 10px;font-size:13px}.btn.del{background:none;color:var(--red);border:1px solid var(--line)}
+input,select,textarea{background:var(--bg);color:var(--tx);border:1px solid var(--line);padding:8px 10px;font:inherit;max-width:100%}
+textarea{width:100%;min-height:70px}
+.card{background:var(--panel);border:1px solid var(--line);padding:16px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:0 1 auto}.row .grow{flex:1 1 180px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.board{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));align-items:start}
+.col h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:0 0 8px}
+.it{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--mut);padding:10px 12px;margin-bottom:8px}
+.it.high{border-left-color:var(--red)}.it.med{border-left-color:var(--amb)}.it.low{border-left-color:var(--grn)}
+.it p{margin:4px 0;font-size:13px;color:var(--mut);white-space:pre-wrap}.it .t{font-weight:600}
+.tag{display:inline-block;font-size:11px;border:1px solid var(--line);padding:0 6px;margin-right:4px;color:var(--mut)}
+.tag.bug{color:var(--red);border-color:var(--red)}
+.ann{border-bottom:1px solid var(--line);padding:10px 0}.ann:last-child{border:0}.ann p{margin:4px 0;white-space:pre-wrap}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top;font-size:14px}
+label.chk{display:inline-flex;gap:4px;align-items:center;margin:0 10px 4px 0;font-size:13px}
+pre{background:var(--bg);border:1px solid var(--line);padding:12px;overflow-x:auto;font-size:13px}
+.center{max-width:460px;margin:12vh auto;text-align:center;padding:0 18px}.err{color:var(--red)}
+</style></head><body>
+<header><div class="wrap"><b>Metro Studios <span class="mut">/ Staff</span></b><span class="sp"></span><div class="who" id="who"></div></div></header>
+<main class="wrap" id="app"><p class="mut" style="margin-top:30px">Loading…</p></main>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const S={me:null,cfg:null,d:null,users:[],tab:'home',game:'',err:''};
+async function api(p,m='GET',b){
+  const r=await fetch('/api/'+p,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.statusText);return j}
+const gname=id=>(S.cfg.games.find(g=>g.id===id)||{name:'Studio'}).name;
+const rname=id=>(S.cfg.roles.find(r=>r.id===id)||{name:id}).name;
+const date=t=>new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+const gOpts=(sel,all)=>(all?'<option value="">All games</option>':'')+S.cfg.games.filter(g=>S.me.games.includes(g.id)).map(g=>`<option value="${g.id}" ${g.id===sel?'selected':''}>${esc(g.name)}</option>`).join('');
+
+async function boot(){
+  try{const r=await api('me');S.me=r.user;S.cfg=r.config}catch(e){return loginScreen(e.message==='Not logged in.'?'':e.message)}
+  $('#who').innerHTML=`${S.me.avatar?`<img src="${esc(S.me.avatar)}" alt="">`:''}<span>${esc(S.me.name)}${S.me.owner?' (owner)':''}</span><a class="btn line sm" href="/api/logout">Log out</a>`;
+  if(!S.me.access)return $('#app').innerHTML=`<div class="center"><h1>Almost there</h1><p class="mut">You are logged in as <b>${esc(S.me.name)}</b>, but you have not been given a game or role yet. Ask the owner to add you, then refresh this page.</p></div>`;
+  await load();
+}
+function loginScreen(m){
+  if(!m&&new URLSearchParams(location.search).has('denied'))m='Access is limited to Metro Studios staff. Join the Discord server and ask the owner for a staff role, then try again.';
+  $('#who').innerHTML='';
+  $('#app').innerHTML=`<div class="center"><h1>Staff area</h1><p class="mut">For Metro Studios team members. Log in with the Discord account the owner knows you by.</p>${m?`<p class="err">${esc(m)}</p>`:''}<a class="btn" href="/api/login">Log in with Discord</a></div>`}
+async function load(){
+  S.d=await api('data');if(S.me.owner||S.me.lead)S.users=(await api('users')).users;
+  S.tt=(await api('tiktoks')).tiktoks;S.camps=(await api('campaigns')).campaigns;if(S.me.owner)S.pay=(await api('payouts')).people;render()}
+async function act(fn){try{S.err='';await fn();await load()}catch(e){S.err=e.message;render()}}
+
+function render(){
+  const tabs=[['home','Home'],['tasks','Tasks'],['bugs','Bugs'],['tiktoks','TikToks']];if(S.me.marketing)tabs.push(['marketing','Marketing']);tabs.push(['pay','Payments'],['links','Links'],['tools','Update writer']);
+  if(S.me.owner)tabs.push(['admin','Admin']);else if(S.me.lead)tabs.push(['admin','My team']);
+  const body={home,tasks:()=>board('task'),bugs:()=>board('bug'),tiktoks,marketing,pay,links,tools,admin}[S.tab]();
+  $('#app').innerHTML=`<h1>Hello, ${esc(S.me.name)}</h1><div class="mut">${S.me.owner?'Owner':S.me.games.map(gname).join(', ')}${S.me.roles.length?' · '+S.me.roles.map(rname).join(', '):''}</div>
+  <nav class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${k===S.tab}" data-tab="${k}">${l}</button>`).join('')}</nav>
+  ${S.err?`<p class="err">${esc(S.err)}</p>`:''}${body}`}
+
+function home(){
+  const mine=S.d.items.filter(i=>i.status!=='done'&&i.assignee&&i.assignee.toLowerCase()===S.me.name.toLowerCase());
+  const open=S.d.items.filter(i=>i.status!=='done');
+  const mgr=S.me.owner||S.me.lead,gSel=S.me.owner?`<option value="">${'Whole studio'}</option>`+S.cfg.games.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join(''):gOpts('');
+  const ownerForm=mgr?`<form class="row" data-form="ann" style="margin-top:12px"><input class="grow" name="title" placeholder="Announcement title" required><select name="game">${gSel}</select><textarea name="text" placeholder="Message"></textarea><button class="btn">Post</button></form>`:'';
+  return `<div class="grid"><div class="card"><h2>Your work</h2>${mine.length?mine.map(i=>`<div class="it ${i.priority}"><span class="t">${esc(i.title)}</span><br><span class="tag">${esc(gname(i.game))}</span><span class="tag">${i.status}</span></div>`).join(''):'<p class="mut">Nothing assigned to you. Items assigned to your Discord display name show here.</p>'}</div>
+  <div class="card"><h2>Studio snapshot</h2>${S.me.games.map(g=>{const x=S.d.items.filter(i=>i.game===g);const o=x.filter(i=>i.status!=='done');return `<p><b>${esc(gname(g))}</b><br><span class="mut">${o.filter(i=>i.type==='task').length} open tasks · ${o.filter(i=>i.type==='bug').length} open bugs · ${x.length-o.length} done</span></p>`}).join('')}
+  <p class="mut">Team: ${S.d.people.length} staff</p></div></div>
+  <div class="card"><h2>Announcements</h2>${S.d.announcements.map(a=>`<div class="ann"><b>${esc(a.title)}</b> <span class="tag">${esc(gname(a.game))}</span><span class="mut"> ${date(a.created)}</span>${(S.me.owner||S.me.lead)?` <button class="btn del sm" data-del="announcements/${a.id}">Delete</button>`:''}<p>${esc(a.text)}</p></div>`).join('')||'<p class="mut">No announcements yet.</p>'}${ownerForm}</div>`}
+
+function board(type){
+  const items=S.d.items.filter(i=>i.type===type&&(!S.game||i.game===S.game));
+  const cols=[['todo','To do'],['doing','In progress'],['done','Done']];
+  const L=type==='bug'?'bug report':'task';
+  return `<div class="card"><form class="row" data-form="item"><input type="hidden" name="type" value="${type}">
+  <input class="grow" name="title" placeholder="New ${L}" required maxlength="120"><select name="game">${gOpts('')}</select>
+  <select name="priority"><option value="med">Medium</option><option value="high">High</option><option value="low">Low</option></select>
+  <input name="assignee" placeholder="Assign to (display name)" list="ppl"><datalist id="ppl">${S.d.people.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
+  <textarea name="notes" placeholder="${type==='bug'?'Steps to reproduce, what you expected, what happened':'Details (optional)'}"></textarea><button class="btn">Add</button></form></div>
+  <div class="row" style="margin-bottom:12px"><span class="mut">Filter:</span><select data-filter>${gOpts(S.game,true)}</select></div>
+  <div class="board">${cols.map(([k,l],ci)=>`<div class="col"><h3>${l} (${items.filter(i=>i.status===k).length})</h3>${items.filter(i=>i.status===k).map(i=>`<div class="it ${i.priority}"><span class="t">${esc(i.title)}</span><br><span class="tag">${esc(gname(i.game))}</span><span class="tag ${i.type}">${i.priority}</span>${i.assignee?`<span class="tag">@${esc(i.assignee)}</span>`:''}${i.notes?`<p>${esc(i.notes)}</p>`:''}
+  <div class="row" style="margin-top:6px">${ci>0?`<button class="btn line sm" data-move="${i.id}:${cols[ci-1][0]}">◀</button>`:''}${ci<2?`<button class="btn line sm" data-move="${i.id}:${cols[ci+1][0]}">▶</button>`:''}${S.me.owner||i.by===S.me.id?`<button class="btn del sm" data-del="items/${i.id}">Delete</button>`:''}</div></div>`).join('')}</div>`).join('')}</div>`}
+
+const rbx=n=>'R$'+Number(n||0).toLocaleString();
+const stTag=s=>`<span class="tag ${s==='rejected'?'bug':''}">${{pending:'Pending approval',approved:'Approved, awaiting payment',paid:'Paid',rejected:'Rejected'}[s]}</span>`;
+const decide=(kind,id,o,note)=>S.me.owner?`<div class="row" style="margin-top:8px"><input id="amt-${id}" type="number" min="0" value="${o.amount||0}" style="width:96px" title="Robux">${note?`<input id="note-${id}" class="grow" placeholder="Note to staff (optional)" value="${esc(o.note||'')}">`:''}
+  ${o.status==='pending'?`<button class="btn sm" data-decide="${kind}:${id}:approve">Approve</button>`:''}${o.status==='approved'?`<button class="btn sm" data-decide="${kind}:${id}:paid">Mark paid</button>`:''}${o.status==='paid'?'':`<button class="btn del sm" data-decide="${kind}:${id}:reject">Reject</button>`}</div>`:'';
+
+function tiktoks(){
+  const add=(S.me.owner||S.me.marketing||S.me.lead)?`<div class="card"><form class="row" data-form="tt"><input class="grow" name="url" type="url" placeholder="Paste a TikTok link" required><button class="btn">Add TikTok</button></form><p class="mut" style="margin:8px 0 0">New TikToks can also arrive automatically. Made one? Press <b>I made this</b> to claim your payment (${rbx(S.me.rates.tiktok)} each).</p></div>`:`<p class="mut">Made one of these? Press <b>I made this</b> to claim your payment (${rbx(S.me.rates.tiktok)} each). Each TikTok can be claimed once.</p>`;
+  return add+`<div class="grid">${S.tt.map(t=>{const c=t.claim,mine=c&&c.by===S.me.id;
+    return `<div class="card" style="margin:0">${t.thumb?`<img src="${esc(t.thumb)}" alt="" style="width:100%;height:170px;object-fit:cover;margin-bottom:8px">`:''}
+    <a href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a><br><span class="mut">${esc(t.author)} · added ${date(t.added)}${t.source==='auto'?' · automatic':''}</span>
+    <div style="margin-top:8px">${!c?`<button class="btn sm" data-claim="${t.id}">I made this · ${rbx(S.me.rates.tiktok)}</button>`:`<span class="tag">Claimed by ${esc(c.name)}</span>${stTag(c.status)}${(mine||S.me.owner)&&c.amount!=null?`<span class="tag">${rbx(c.amount)}</span>`:''}${mine&&c.status==='pending'?` <button class="btn del sm" data-del="tiktoks/${t.id}/claim">Withdraw</button>`:''}`}</div>
+    ${c?decide('tiktoks',t.id,c):''}${S.me.owner?`<div style="margin-top:8px"><button class="btn del sm" data-del="tiktoks/${t.id}" data-confirm="Delete this TikTok from the list?">Delete</button></div>`:''}</div>`}).join('')||'<p class="mut">No TikToks yet.</p>'}</div>`}
+
+function marketing(){
+  return `<div class="card"><h2>Claim a marketing campaign</h2><p class="mut">Describe what you did and attach proof (screenshots and/or links). You are paid ${rbx(S.me.rates.campaign)} per approved campaign.</p>
+  <form data-form="camp"><div class="row"><input class="grow" name="title" placeholder="Campaign title (e.g. Reddit posts for Westbrook County)" required maxlength="120"></div>
+  <textarea name="description" placeholder="What did you do? Where, when, how many people did it reach?" style="margin-top:8px"></textarea>
+  <textarea name="links" placeholder="Proof links, one per line (optional if you attach screenshots)"></textarea>
+  <div class="row" style="margin-top:8px"><input type="file" name="proofs" accept="image/*" multiple><span class="mut">Up to 4 screenshots</span><button class="btn">Submit claim</button></div></form></div>
+  ${S.camps.map(c=>`<div class="card"><b>${esc(c.title)}</b> ${stTag(c.status)}<span class="tag">${rbx(c.amount)}</span>${S.me.owner?`<span class="tag">by ${esc(c.name)}</span>`:''}<span class="mut"> ${date(c.created)}</span>
+  ${c.description?`<p style="white-space:pre-wrap">${esc(c.description)}</p>`:''}${c.links.map(l=>`<div><a href="${esc(l)}" target="_blank" rel="noopener">${esc(l)}</a></div>`).join('')}
+  <div class="row" style="margin-top:8px">${c.proofs.map(id=>`<a href="/api/proof/${id}" target="_blank"><img src="/api/proof/${id}" alt="Proof" style="height:96px;border:1px solid var(--line)"></a>`).join('')}</div>
+  ${c.note&&!S.me.owner?`<p class="mut">Owner note: ${esc(c.note)}</p>`:''}${decide('campaigns',c.id,c,true)}
+  ${S.me.owner||['pending','rejected'].includes(c.status)?`<div style="margin-top:8px"><button class="btn del sm" data-del="campaigns/${c.id}" data-confirm="Delete this claim and its proof?">Delete</button></div>`:''}</div>`).join('')||'<p class="mut">No campaign claims yet.</p>'}`}
+
+function pay(){
+  const mine=[...S.tt.filter(t=>t.claim&&t.claim.by===S.me.id).map(t=>({what:'TikTok: '+t.title,status:t.claim.status,amount:t.claim.amount,at:t.claim.at})),...S.camps.filter(c=>c.by===S.me.id).map(c=>({what:'Campaign: '+c.title,status:c.status,amount:c.amount,at:c.created}))].sort((a,b)=>b.at-a.at);
+  const sum=st=>mine.filter(x=>x.status===st).reduce((n,x)=>n+(x.amount||0),0);
+  let h=`<div class="grid"><div class="card"><h2>Your earnings</h2><p><b>${rbx(sum('approved'))}</b> owed to you<br><span class="mut">${rbx(sum('pending'))} waiting for approval · ${rbx(sum('paid'))} paid so far</span></p>
+  <form class="row" data-form="profile"><input class="grow" name="roblox" placeholder="Your Roblox username (for payment)" value="${esc(S.me.roblox)}" maxlength="20"><button class="btn sm">Save</button></form></div>
+  <div class="card"><h2>Your claims</h2>${mine.map(x=>`<div class="ann"><b>${esc(x.what)}</b> ${stTag(x.status)}<span class="tag">${rbx(x.amount)}</span></div>`).join('')||'<p class="mut">Nothing claimed yet.</p>'}</div></div>`;
+  if(S.me.owner)h+=`<div class="card"><h2>Pay rates (Robux)</h2><p class="mut">Default amount per approved item. You can override it for each person below, or change one claim's amount when you approve it. The amount is fixed when a claim is made.</p>
+  <form class="row" data-form="rates"><label>Per TikTok <input name="tiktok" type="number" min="0" value="${S.cfg.rates.tiktok}" style="width:100px"></label><label>Per campaign <input name="campaign" type="number" min="0" value="${S.cfg.rates.campaign}" style="width:100px"></label><button class="btn sm">Save defaults</button></form></div>
+  <div class="card"><h2>Staff payments</h2><table><tr><th>Person</th><th>TikTok rate</th><th>Campaign rate</th><th>Pending</th><th>Owed</th><th>Paid</th><th></th></tr>
+  ${S.pay.map(u=>`<tr data-rate="${u.id}"><td><b>${esc(u.name)}</b><br><span class="mut">${u.roblox?'@'+esc(u.roblox):'no Roblox name yet'}</span></td>
+  <td><input data-k="tiktok" type="number" min="0" style="width:84px" placeholder="${S.cfg.rates.tiktok}" value="${u.rates.tiktok??''}"></td><td><input data-k="campaign" type="number" min="0" style="width:84px" placeholder="${S.cfg.rates.campaign}" value="${u.rates.campaign??''}"></td>
+  <td>${rbx(u.pending)}</td><td><b>${rbx(u.owed)}</b></td><td>${rbx(u.paid)}</td><td>${u.owed?`<button class="btn sm" data-payall="${u.id}" data-confirm="Mark everything owed to ${esc(u.name)} as paid? Send the Robux first.">Mark paid</button>`:''}</td></tr>`).join('')}</table><p class="mut">Blank rate = use the default. Approve claims in the TikToks and Marketing tabs, send the Robux, then press Mark paid.</p></div>`;
+  return h}
+
+function links(){
+  const mg=S.me.owner||S.me.lead,f=mg?`<form class="row" data-form="link"><input class="grow" name="title" placeholder="Title (e.g. Style guide)" required><input class="grow" name="url" type="url" placeholder="https://…" required><select name="game">${S.me.owner?'<option value="">Everyone</option>'+S.cfg.games.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join(''):gOpts('')}</select><button class="btn">Add link</button></form>`:'';
+  return `<div class="card"><h2>Resources</h2>${S.d.links.map(l=>`<div class="ann"><a href="${esc(l.url)}" target="_blank" rel="noopener"><b>${esc(l.title)}</b></a> <span class="tag">${esc(gname(l.game))}</span>${mg?` <button class="btn del sm" data-del="links/${l.id}">Delete</button>`:''}</div>`).join('')||'<p class="mut">No links yet.</p>'}${f}</div>`}
+
+function leadTeam(){
+  const gs=S.cfg.games.filter(g=>S.me.games.includes(g.id)),rs=S.cfg.roles.filter(r=>r.id!=='game-lead');
+  return `<div class="card"><h2>My team</h2><p class="mut">Add people to ${gs.map(g=>esc(g.name)).join(', ')} and give them a role. New people appear here after they log in with Discord. Untick everything to remove someone from your game.</p><table>
+  ${S.users.filter(u=>u.id!==S.me.id).map(u=>`<tr data-user="${u.id}"><td><b>${esc(u.name)}</b><br><span class="mut">seen ${date(u.seen)}</span></td><td>${gs.map(g=>`<label class="chk"><input type="checkbox" data-g="${g.id}" ${u.games.includes(g.id)?'checked':''}>${esc(g.name)}</label>`).join('')}<br>${rs.map(r=>`<label class="chk"><input type="checkbox" data-r="${r.id}" ${u.roles.includes(r.id)?'checked':''}>${esc(r.name)}</label>`).join('')}</td></tr>`).join('')||'<tr><td class="mut">Nobody else has logged in yet.</td></tr>'}</table></div>`}
+
+function tools(){
+  return `<div class="card"><h2>Update writer</h2><p class="mut">Fill this in and copy the result into the <code>news</code> list in <code>content.js</code>.</p>
+  <div class="row"><select id="u-game"><option value="">Studio-wide</option>${S.cfg.games.filter(g=>S.me.games.includes(g.id)).map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select><input id="u-title" class="grow" placeholder="Headline (e.g. Weekly update)"></div>
+  <textarea id="u-items" placeholder="One change per line" style="min-height:140px;margin-top:8px"></textarea>
+  <pre id="u-out"></pre><button class="btn" data-copy>Copy</button></div>`}
+function buildUpdate(){
+  const q=s=>JSON.stringify(s),it=$('#u-items').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  $('#u-out').textContent=`    {\n      date: ${q(new Date().toISOString().slice(0,10))},\n      game: ${q($('#u-game').value)},\n      title: ${q($('#u-title').value||'Update')},\n      items: [\n${it.map(s=>'        '+q(s)).join(',\n')}\n      ]\n    },`}
+
+function admin(){
+  if(!S.me.owner)return leadTeam();
+  const gr=(k,list)=>`<div class="card"><h2>${k==='games'?'Games':'Roles'}</h2>${list.map(x=>`<div class="row" style="margin-bottom:6px"><b class="grow">${esc(x.name)}</b><button class="btn del sm" data-del="${k}/${x.id}" data-confirm="Delete ${esc(x.name)}?${k==='games'?' This also deletes its tasks, bugs, announcements and links.':''}">Delete</button></div>`).join('')}<form class="row" data-form="${k}"><input class="grow" name="name" placeholder="New ${k==='games'?'game':'role'} name" required><button class="btn">Add</button></form></div>`;
+  return `<div class="grid">${gr('games',S.cfg.games)}${gr('roles',S.cfg.roles)}</div>
+  <div class="card"><h2>People</h2><p class="mut">Anyone who logs in with Discord appears here with no access until you tick a game or role.</p><table>
+  ${S.users.map(u=>u.id===S.me.id?`<tr><td><b>${esc(u.name)}</b></td><td class="mut">Owner, full access</td><td></td></tr>`:`<tr data-user="${u.id}"><td><b>${esc(u.name)}</b><br><span class="mut">seen ${date(u.seen)}</span></td>
+  <td>${S.cfg.games.map(g=>`<label class="chk"><input type="checkbox" data-g="${g.id}" ${u.games.includes(g.id)?'checked':''}>${esc(g.name)}</label>`).join('')}<br>${S.cfg.roles.map(r=>`<label class="chk"><input type="checkbox" data-r="${r.id}" ${u.roles.includes(r.id)?'checked':''}>${esc(r.name)}</label>`).join('')}</td>
+  <td><button class="btn del sm" data-del="users/${u.id}" data-confirm="Remove ${esc(u.name)}?">Remove</button></td></tr>`).join('')}</table></div>`}
+
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall]');if(!t)return;
+  if(t.dataset.tab){S.tab=t.dataset.tab;S.err='';render()}
+  else if(t.dataset.del){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(async()=>{const r=await api(t.dataset.del,'DELETE');if(r.games&&r.roles)S.cfg=r})}
+  else if(t.dataset.move){const[id,st]=t.dataset.move.split(':');act(()=>api('items/'+id,'PATCH',{status:st}))}
+  else if(t.dataset.claim){act(()=>api('tiktoks/'+t.dataset.claim+'/claim','POST',{}))}
+  else if(t.dataset.decide){const[kind,id,action]=t.dataset.decide.split(':'),b={action,amount:$('#amt-'+id)?.value};if($('#note-'+id))b.note=$('#note-'+id).value;act(()=>api(kind+'/'+id,'PATCH',b))}
+  else if(t.dataset.payall){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(()=>api('payouts','POST',{user:t.dataset.payall}))}
+  else if(t.dataset.copy){navigator.clipboard?.writeText($('#u-out').textContent);t.textContent='Copied'}});
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
+  const b=Object.fromEntries(new FormData(f)),k=f.dataset.form;
+  if(k==='camp')return act(async()=>{
+    const files=[...f.querySelector('[name=proofs]').files].slice(0,4),proofs=await Promise.all(files.map(shrink));
+    await api('campaigns','POST',{title:b.title,description:b.description,links:(b.links||'').split('\n').map(x=>x.trim()).filter(Boolean),proofs})});
+  const[path,m]={ann:['announcements'],item:['items'],link:['links'],games:['games'],roles:['roles'],tt:['tiktoks'],rates:['rates','PUT'],profile:['profile','PUT']}[k];
+  act(async()=>{const r=await api(path,m||'POST',b);if(r.games&&r.roles)S.cfg=r;if(k==='profile')S.me.roblox=r.roblox})});
+async function shrink(file){const bm=await createImageBitmap(file),sc=Math.min(1,1280/Math.max(bm.width,bm.height)),c=document.createElement('canvas');c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.8)}
+document.addEventListener('change',e=>{
+  if(e.target.matches('[data-filter]')){S.game=e.target.value;render();return}
+  const rr=e.target.closest('[data-rate]');
+  if(rr){const g=k=>rr.querySelector(`[data-k=${k}]`).value;act(()=>api('rates','PUT',{user:rr.dataset.rate,tiktok:g('tiktok'),campaign:g('campaign')}));return}
+  const row=e.target.closest('[data-user]');if(!row)return;
+  const pick=a=>[...row.querySelectorAll(`[data-${a}]:checked`)].map(c=>c.dataset[a]);
+  act(()=>api('users/'+row.dataset.user,'PUT',{games:pick('g'),roles:pick('r')}))});
+document.addEventListener('input',e=>{if(e.target.closest('#u-items,#u-title,#u-game'))buildUpdate()});
+boot();
+</script></body></html>
