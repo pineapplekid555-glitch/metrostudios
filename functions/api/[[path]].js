@@ -53,7 +53,7 @@ async function addTikTok(env, raw, source, by, extra = {}) {
   if (!/(^|\.)tiktok\.com$/i.test(u.hostname)) return { error: "It must be a tiktok.com link.", status: 400 };
   u.search = ""; u.hash = "";
   const clean = u.toString().replace(/\/$/, "");
-  const id = (clean.match(/\/video\/(\d+)/) || [])[1] || slug(clean).slice(0, 80);
+  const id = (clean.match(/\/(?:video|photo)\/(\d+)/) || [])[1] || slug(clean).slice(0, 80);
   if (await env.STAFF.get("tt:" + id)) return { error: "That TikTok is already on the list.", status: 409, duplicate: true };
   let title = "", author = "", thumb = "";
   try {
@@ -266,7 +266,7 @@ export async function onRequest({ request, env }) {
         html = await r.text();
       } catch { return fail("Could not reach TikTok.", 502); }
       const ids = new Set();
-      for (const m of html.matchAll(/\/video\/(\d{15,22})/g)) ids.add(m[1]);
+      for (const m of html.matchAll(/\/(?:video|photo)\/(\d{15,22})/g)) ids.add(m[1]);
       for (const m of html.matchAll(/"(?:itemId|awemeId)":"(\d{15,22})"/g)) ids.add(m[1]);
       const urls = [...ids].map(id => "https://www.tiktok.com/@" + user + "/video/" + id);
       return json({ urls, user });
