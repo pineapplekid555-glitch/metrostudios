@@ -106,11 +106,12 @@ const decide=(kind,id,o,note)=>S.me.owner?`<div class="row" style="margin-top:8p
   ${o.status==='pending'?`<button class="btn sm" data-decide="${kind}:${id}:approve">Approve</button>`:''}${o.status==='approved'?`<button class="btn sm" data-decide="${kind}:${id}:paid">Mark paid</button>`:''}${o.status==='paid'?'':`<button class="btn del sm" data-decide="${kind}:${id}:reject">Reject</button>`}</div>`:'';
 
 function tiktoks(){
-  const add=(S.me.owner||S.me.marketing||S.me.lead)?`<div class="card"><form class="row" data-form="tt"><input class="grow" name="url" type="url" placeholder="Paste a TikTok link" required><button class="btn">Add TikTok</button></form><p class="mut" style="margin:8px 0 0">New TikToks can also arrive automatically. Made one? Press <b>I made this</b> to claim your payment (${rbx(S.me.rates.tiktok)} each).</p></div>`:`<p class="mut">Made one of these? Press <b>I made this</b> to claim your payment (${rbx(S.me.rates.tiktok)} each). Each TikTok can be claimed once.</p>`;
+  const canMk=S.me.roles.includes('marketing');
+  const add=(S.me.owner||S.me.marketing||S.me.lead)?`<div class="card"><form data-form="tt"><textarea name="urls" placeholder="Paste one or more TikTok links, one per line" required></textarea><div class="row" style="margin-top:8px"><button class="btn">Add TikToks</button><button class="btn line" type="button" data-sync="1">Sync from TikTok</button></div></form><p class="mut" style="margin:8px 0 0"><b>Sync from TikTok</b> pulls in the videos from @metrostudiosoffical that TikTok shows publicly. If an older one is missed, paste its link above. Only Marketing staff can press <b>I made this</b>, and every claim waits for the owner to approve it.</p></div>`:`<p class="mut">${canMk?`Made one of these? Press <b>I made this</b> to claim your payment (${rbx(S.me.rates.tiktok)} each). The owner approves it before it is paid.`:'Only Marketing staff can claim TikToks.'}</p>`;
   return add+`<div class="grid">${S.tt.map(t=>{const c=t.claim,mine=c&&c.by===S.me.id;
     return `<div class="card" style="margin:0">${t.thumb?`<img src="${esc(t.thumb)}" alt="" style="width:100%;height:170px;object-fit:cover;margin-bottom:8px">`:''}
     <a href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a><br><span class="mut">${esc(t.author)} · added ${date(t.added)}${t.source==='auto'?' · automatic':''}</span>
-    <div style="margin-top:8px">${!c?`<button class="btn sm" data-claim="${t.id}">I made this · ${rbx(S.me.rates.tiktok)}</button>`:`<span class="tag">Claimed by ${esc(c.name)}</span>${stTag(c.status)}${(mine||S.me.owner)&&c.amount!=null?`<span class="tag">${rbx(c.amount)}</span>`:''}${mine&&c.status==='pending'?` <button class="btn del sm" data-del="tiktoks/${t.id}/claim">Withdraw</button>`:''}`}</div>
+    <div style="margin-top:8px">${!c?(canMk?`<button class="btn sm" data-claim="${t.id}">I made this · ${rbx(S.me.rates.tiktok)}</button>`:`<span class="tag">Unclaimed</span>`):`<span class="tag">Claimed by ${esc(c.name)}</span>${stTag(c.status)}${(mine||S.me.owner)&&c.amount!=null?`<span class="tag">${rbx(c.amount)}</span>`:''}${mine&&c.status==='pending'?` <button class="btn del sm" data-del="tiktoks/${t.id}/claim">Withdraw</button>`:''}`}</div>
     ${c?decide('tiktoks',t.id,c):''}${S.me.owner?`<div style="margin-top:8px"><button class="btn del sm" data-del="tiktoks/${t.id}" data-confirm="Delete this TikTok from the list?">Delete</button></div>`:''}</div>`}).join('')||'<p class="mut">No TikToks yet.</p>'}</div>`}
 
 function marketing(){
@@ -167,22 +168,28 @@ function admin(){
   <td><button class="btn del sm" data-del="users/${u.id}" data-confirm="Remove ${esc(u.name)}?">Remove</button></td></tr>`).join('')}</table></div>`}
 
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall]');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync]');if(!t)return;
   if(t.dataset.tab){S.tab=t.dataset.tab;S.err='';render()}
   else if(t.dataset.del){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(async()=>{const r=await api(t.dataset.del,'DELETE');if(r.games&&r.roles)S.cfg=r})}
   else if(t.dataset.move){const[id,st]=t.dataset.move.split(':');act(()=>api('items/'+id,'PATCH',{status:st}))}
   else if(t.dataset.claim){act(()=>api('tiktoks/'+t.dataset.claim+'/claim','POST',{}))}
   else if(t.dataset.decide){const[kind,id,action]=t.dataset.decide.split(':'),b={action,amount:$('#amt-'+id)?.value};if($('#note-'+id))b.note=$('#note-'+id).value;act(()=>api(kind+'/'+id,'PATCH',b))}
   else if(t.dataset.payall){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(()=>api('payouts','POST',{user:t.dataset.payall}))}
+  else if(t.dataset.sync){act(async()=>{const r=await api('tiktoks/discover','POST',{});if(!r.urls.length){alert('TikTok did not show any videos for @'+r.user+'. Paste the links in the box instead.');return}await addMany(r.urls)})}
   else if(t.dataset.copy){navigator.clipboard?.writeText($('#u-out').textContent);t.textContent='Copied'}});
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
   const b=Object.fromEntries(new FormData(f)),k=f.dataset.form;
+  if(k==='tt')return act(async()=>{await addMany(b.urls.split(/\s+/).filter(Boolean))});
   if(k==='camp')return act(async()=>{
     const files=[...f.querySelector('[name=proofs]').files].slice(0,4),proofs=await Promise.all(files.map(shrink));
     await api('campaigns','POST',{title:b.title,description:b.description,links:(b.links||'').split('\n').map(x=>x.trim()).filter(Boolean),proofs})});
   const[path,m]={ann:['announcements'],item:['items'],link:['links'],games:['games'],roles:['roles'],tt:['tiktoks'],rates:['rates','PUT'],profile:['profile','PUT']}[k];
   act(async()=>{const r=await api(path,m||'POST',b);if(r.games&&r.roles)S.cfg=r;if(k==='profile')S.me.roblox=r.roblox})});
+async function addMany(urls){
+  urls=[...new Set(urls)];let added=0,dupes=0;const bad=[];
+  for(const u of urls){try{await api('tiktoks','POST',{url:u});added++}catch(e){/already/i.test(e.message)?dupes++:bad.push(u+' ('+e.message+')')}}
+  alert(`Added ${added}. Already on the list: ${dupes}.`+(bad.length?`\nCould not add:\n`+bad.join('\n'):''))}
 async function shrink(file){const bm=await createImageBitmap(file),sc=Math.min(1,1280/Math.max(bm.width,bm.height)),c=document.createElement('canvas');c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.8)}
 document.addEventListener('change',e=>{
   if(e.target.matches('[data-filter]')){S.game=e.target.value;render();return}

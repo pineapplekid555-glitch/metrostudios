@@ -13,6 +13,8 @@ const DEFAULTS = {
 };
 
 const enc = new TextEncoder();
+// The studio TikTok account that "Sync from TikTok" reads.
+const TIKTOK_USER = "metrostudiosoffical";
 // Metro Studios Discord server and staff role (IDs are not secret). Env vars of the same name override these.
 const GUILD_ID = "1464024797263429645";
 const STAFF_ROLE_ID = "1464024797695705203";
@@ -252,10 +254,28 @@ export async function onRequest({ request, env }) {
       const r = await addTikTok(env, body.url, "manual", uid);
       return r.rec ? json(r.rec) : fail(r.error, r.status);
     }
+    // Best-effort backfill: read the public TikTok profile page and return the video links it exposes.
+    // TikTok does not offer a free list of all videos, so this can miss older ones; the staff page then
+    // adds each link one at a time (and anything missed can be pasted in by hand).
+    if (b === "discover" && method === "POST") {
+      if (!(owner || marketing || lead)) return fail("Only marketing staff, leads or the owner can sync TikToks.", 403);
+      const user = TIKTOK_USER;
+      let html = "";
+      try {
+        const r = await fetch("https://www.tiktok.com/@" + user, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept-Language": "en-GB,en;q=0.9" } });
+        html = await r.text();
+      } catch { return fail("Could not reach TikTok.", 502); }
+      const ids = new Set();
+      for (const m of html.matchAll(/\/video\/(\d{15,22})/g)) ids.add(m[1]);
+      for (const m of html.matchAll(/"(?:itemId|awemeId)":"(\d{15,22})"/g)) ids.add(m[1]);
+      const urls = [...ids].map(id => "https://www.tiktok.com/@" + user + "/video/" + id);
+      return json({ urls, user });
+    }
     const t = JSON.parse((await env.STAFF.get("tt:" + b)) || "null");
     if (!t) return fail("Not found.", 404);
     const save = async () => { await env.STAFF.put("tt:" + t.id, JSON.stringify(t)); return json(t); };
     if (c === "claim" && method === "POST") {
+      if (!myRoles.includes("marketing")) return fail("Only marketing staff can claim TikToks.", 403);
       if (t.claim) return fail("Already claimed by " + t.claim.name + ".");
       t.claim = { by: uid, name: me.name, at: Date.now(), amount: rateFor(me, "tiktok"), status: "pending" };
       return save();

@@ -31,7 +31,7 @@ part runs on **Cloudflare Pages** (free). GitHub Pages alone cannot do it.
 - Default games and roles are created on first use; change them in Admin.
 
 ## TikToks, campaign claims and payments
-- **TikToks tab**: every staff member sees the list and can press "I made this" once per TikTok. The owner approves
+- **TikToks tab**: every staff member sees the list, but only people with the **Marketing** role can press "I made this" (once per TikTok). The owner approves
   or rejects (and can change the Robux amount), sends the Robux, then presses Mark paid.
 - **Marketing tab** (people with the **Marketing** role): submit a campaign with a description, proof links and up to
   4 screenshots. The owner sees the proof, approves or rejects with an optional note, and marks it paid.
