@@ -305,6 +305,14 @@ export async function onRequest({ request, env }) {
       if (o) { if (o.title) t.title = clip(o.title, 200); if (o.author_name) t.author = clip(o.author_name, 60); if (/^https:\/\//.test(o.thumbnail_url || "")) t.thumb = o.thumbnail_url; }
       return save();
     }
+    // Staff browsers can fetch TikTok's preview themselves and hand it back (TikTok often blocks the server).
+    if (c === "details" && method === "POST") {
+      if (!(owner || marketing || lead)) return fail("Not allowed.", 403);
+      if (body.title) t.title = clip(body.title, 200);
+      if (body.author) t.author = clip(body.author, 60);
+      if (/^https:\/\/[^\s]{1,1500}$/.test(String(body.thumb || ""))) t.thumb = body.thumb;
+      return save();
+    }
     if (c === "claim" && method === "POST") {
       if (!marketing) return fail("Only marketing staff can claim TikToks.", 403);
       if (t.claim) return fail("Already claimed by " + t.claim.name + ".");
@@ -318,6 +326,7 @@ export async function onRequest({ request, env }) {
     }
     if (!owner) return fail("Owner only.", 403);
     if (method === "DELETE") { await env.STAFF.delete("tt:" + t.id); return json({ ok: true }); }
+    if (method === "PATCH" && body.action === "reset") { t.claim = null; return save(); }
     if (method === "PATCH") {
       if (!t.claim) return fail("Nobody has claimed this yet.");
       const r = decide(t.claim, body);
