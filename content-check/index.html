@@ -48,7 +48,7 @@
   var SLUGS = { 'westbrook-county': 'Westbrook County', 'project-alba': 'Project Alba', 'oath-of-caledonia': 'Oath of Caledonia' };
   var KEYS = {
     top: ['links', 'games', 'news', 'team'],
-    links: ['discord', 'group'],
+    links: ['discord', 'group', 'tiktok'],
     game: ['status', 'release', 'play', 'website', 'screenshots'],
     shot: ['image', 'caption', 'alt'],
     news: ['date', 'game', 'title', 'text', 'items', 'link'],
@@ -76,7 +76,7 @@
 
     var L = S.links || {};
     keys(L, 'links', 'links');
-    ['discord', 'group'].forEach(function (k) {
+    ['discord', 'group', 'tiktok'].forEach(function (k) {
       if (!L[k]) warn('links.' + k + ' is empty, so those buttons are hidden.');
       else if (!isUrl(L[k])) bad('links.' + k + ' is not a web address.', 'It should start with https://');
     });

@@ -39,25 +39,31 @@ pre{background:var(--bg);border:1px solid var(--line);padding:12px;overflow-x:au
 <main class="wrap" id="app"><p class="mut" style="margin-top:30px">Loading…</p></main>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const API=location.pathname.replace(/staff(\/(index\.html)?)?$/,'')+'api/',NOAPI='NO_API';
 const S={me:null,cfg:null,d:null,users:[],tab:'home',game:'',err:''};
 async function api(p,m='GET',b){
-  const r=await fetch('/api/'+p,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.statusText);return j}
+  const r=await fetch(API+p,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
+  const j=await r.json().catch(()=>null);
+  if(j===null)throw new Error(NOAPI);
+  if(!r.ok)throw new Error(j.error||r.statusText);return j}
 const gname=id=>(S.cfg.games.find(g=>g.id===id)||{name:'Studio'}).name;
 const rname=id=>(S.cfg.roles.find(r=>r.id===id)||{name:id}).name;
 const date=t=>new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 const gOpts=(sel,all)=>(all?'<option value="">All games</option>':'')+S.cfg.games.filter(g=>S.me.games.includes(g.id)).map(g=>`<option value="${g.id}" ${g.id===sel?'selected':''}>${esc(g.name)}</option>`).join('');
 
 async function boot(){
-  try{const r=await api('me');S.me=r.user;S.cfg=r.config}catch(e){return loginScreen(e.message==='Not logged in.'?'':e.message)}
-  $('#who').innerHTML=`${S.me.avatar?`<img src="${esc(S.me.avatar)}" alt="">`:''}<span>${esc(S.me.name)}${S.me.owner?' (owner)':''}</span><a class="btn line sm" href="/api/logout">Log out</a>`;
+  try{const r=await api('me');S.me=r.user;S.cfg=r.config}catch(e){return e.message===NOAPI?noApiScreen():loginScreen(e.message==='Not logged in.'?'':e.message)}
+  $('#who').innerHTML=`${S.me.avatar?`<img src="${esc(S.me.avatar)}" alt="">`:''}<span>${esc(S.me.name)}${S.me.owner?' (owner)':''}</span><a class="btn line sm" href="${API}logout">Log out</a>`;
   if(!S.me.access)return $('#app').innerHTML=`<div class="center"><h1>Almost there</h1><p class="mut">You are logged in as <b>${esc(S.me.name)}</b>, but you have not been given a game or role yet. Ask the owner to add you, then refresh this page.</p></div>`;
   await load();
 }
+function noApiScreen(){
+  $('#who').innerHTML='';
+  $('#app').innerHTML=`<div class="center"><h1>Staff login unavailable</h1><p class="mut">The staff area could not reach its login server. This usually means the site is being served from GitHub Pages, which cannot run the Discord login. Open the staff page on the Cloudflare Pages address instead.</p><p><a class="btn line" href="./">Try again</a></p></div>`}
 function loginScreen(m){
   if(!m&&new URLSearchParams(location.search).has('denied'))m='Access is limited to Metro Studios staff. Join the Discord server and ask the owner for a staff role, then try again.';
   $('#who').innerHTML='';
-  $('#app').innerHTML=`<div class="center"><h1>Staff area</h1><p class="mut">For Metro Studios team members. Log in with the Discord account the owner knows you by.</p>${m?`<p class="err">${esc(m)}</p>`:''}<a class="btn" href="/api/login">Log in with Discord</a></div>`}
+  $('#app').innerHTML=`<div class="center"><h1>Staff area</h1><p class="mut">For Metro Studios team members. Log in with the Discord account the owner knows you by.</p>${m?`<p class="err">${esc(m)}</p>`:''}<a class="btn" href="${API}login">Log in with Discord</a></div>`}
 async function load(){
   S.d=await api('data');if(S.me.owner||S.me.lead)S.users=(await api('users')).users;
   S.tt=(await api('tiktoks')).tiktoks;S.camps=(await api('campaigns')).campaigns;if(S.me.owner)S.pay=(await api('payouts')).people;render()}
@@ -115,7 +121,7 @@ function marketing(){
   <div class="row" style="margin-top:8px"><input type="file" name="proofs" accept="image/*" multiple><span class="mut">Up to 4 screenshots</span><button class="btn">Submit claim</button></div></form></div>
   ${S.camps.map(c=>`<div class="card"><b>${esc(c.title)}</b> ${stTag(c.status)}<span class="tag">${rbx(c.amount)}</span>${S.me.owner?`<span class="tag">by ${esc(c.name)}</span>`:''}<span class="mut"> ${date(c.created)}</span>
   ${c.description?`<p style="white-space:pre-wrap">${esc(c.description)}</p>`:''}${c.links.map(l=>`<div><a href="${esc(l)}" target="_blank" rel="noopener">${esc(l)}</a></div>`).join('')}
-  <div class="row" style="margin-top:8px">${c.proofs.map(id=>`<a href="/api/proof/${id}" target="_blank"><img src="/api/proof/${id}" alt="Proof" style="height:96px;border:1px solid var(--line)"></a>`).join('')}</div>
+  <div class="row" style="margin-top:8px">${c.proofs.map(id=>`<a href="${API}proof/${id}" target="_blank"><img src="${API}proof/${id}" alt="Proof" style="height:96px;border:1px solid var(--line)"></a>`).join('')}</div>
   ${c.note&&!S.me.owner?`<p class="mut">Owner note: ${esc(c.note)}</p>`:''}${decide('campaigns',c.id,c,true)}
   ${S.me.owner||['pending','rejected'].includes(c.status)?`<div style="margin-top:8px"><button class="btn del sm" data-del="campaigns/${c.id}" data-confirm="Delete this claim and its proof?">Delete</button></div>`:''}</div>`).join('')||'<p class="mut">No campaign claims yet.</p>'}`}
 

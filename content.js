@@ -24,7 +24,8 @@ window.SITE = {
      Used by every Discord and Roblox group button and in the footer.        */
   links: {
     discord: "https://discord.gg/dByeJMQQdh",   // currently the Westbrook County Discord
-    group:   "https://www.roblox.com/search/communities?keyword=Metro%20Studios"   // swap for your group's page when you have it
+    group:   "https://www.roblox.com/search/communities?keyword=Metro%20Studios",   // swap for your group's page when you have it
+    tiktok:  "https://www.tiktok.com/@metrostudiosoffical"
   },
 
 
