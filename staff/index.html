@@ -52,6 +52,17 @@ pre{background:var(--bg);border:1px solid var(--line);padding:12px;overflow-x:au
 .tm{color:var(--mut);font-size:12px}.tb .btn{width:100%;text-align:center;padding:10px}.tb .row .btn{flex:1}
 .tb details summary{cursor:pointer;color:var(--mut);font-size:12px}.tb details .row{margin-top:6px}.tb details input{width:90px}
 .bar{position:sticky;bottom:14px;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--ac);border-radius:12px;padding:10px 14px;margin-top:16px;box-shadow:0 8px 30px rgba(0,0,0,.35)}.bar b{flex:1 1 auto}
+.th.ph0{border:0;width:100%;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--mut);font:inherit}
+.th.ph0 svg{width:46px;height:46px;opacity:.8}.th.ph0 span.w{font-size:13px}
+.th.emb{aspect-ratio:auto;height:560px}.th.emb iframe{width:100%;height:100%;border:0;background:#000}
+.search{flex:1 1 220px;min-width:160px}
+.lnk{background:none;border:0;color:var(--tx);text-decoration:underline;cursor:pointer;font:inherit;font-size:12px;padding:0 4px}
+.paygrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));margin-bottom:18px}
+.pc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}.pc.due{border-color:var(--grn)}
+.pc .ph{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.pc .amt{text-align:right}.pc .amt b{font-size:1.7rem;line-height:1.1;display:block}.pc .amt span{color:var(--mut);font-size:12px}
+.pc details summary{cursor:pointer;color:var(--mut);font-size:13px}.li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.li:last-child{border:0}
+.hint{border:1px solid var(--amb);background:rgba(245,165,36,.08);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px}
 .empty{text-align:center;padding:40px 10px;color:var(--mut)}
 .center{max-width:460px;margin:12vh auto;text-align:center;padding:0 18px}.err{color:var(--red)}
 </style></head><body>
@@ -60,7 +71,7 @@ pre{background:var(--bg);border:1px solid var(--line);padding:12px;overflow-x:au
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API=location.pathname.replace(/staff(\/(index\.html)?)?$/,'')+'api/',NOAPI='NO_API';
-const S={ttf:'all',sel:new Set(),me:null,cfg:null,d:null,users:[],tab:'home',game:'',err:''};
+const S={ttf:'all',sel:new Set(),q:'',watch:'',paylist:'',me:null,cfg:null,d:null,users:[],tab:'home',game:'',err:''};
 async function api(p,m='GET',b){
   const r=await fetch(API+p,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
   const j=await r.json().catch(()=>null);
@@ -125,6 +136,8 @@ const stTag=s=>`<span class="tag ${s==='rejected'?'bug':''}">${{pending:'Pending
 const decide=(kind,id,o,note)=>S.me.owner?`<div class="row" style="margin-top:8px"><input id="amt-${id}" type="number" min="0" value="${o.amount||0}" style="width:96px" title="Robux">${note?`<input id="note-${id}" class="grow" placeholder="Note to staff (optional)" value="${esc(o.note||'')}">`:''}
   ${o.status==='pending'?`<button class="btn sm" data-decide="${kind}:${id}:approve">Approve</button>`:''}${o.status==='approved'?`<button class="btn sm" data-decide="${kind}:${id}:paid">Mark paid</button>`:''}${o.status==='paid'?'':`<button class="btn del sm" data-decide="${kind}:${id}:reject">Reject</button>`}</div>`:'';
 
+const ttl=t=>t.title&&t.title!=='TikTok'?t.title:'TikTok …'+String(t.id).slice(-6);
+const tau=t=>t.author||((String(t.url).match(/@([^/]+)/)||[])[1]||'');
 function tiktoks(){
   const me=S.me,own=me.owner,canMk=own||me.roles.includes('marketing'),mgr=own||me.marketing||me.lead,all=S.tt;
   const un=all.filter(t=>!t.claim),mine=all.filter(t=>t.claim&&t.claim.by===me.id),pend=all.filter(t=>t.claim&&t.claim.status==='pending'),appr=all.filter(t=>t.claim&&t.claim.status==='approved');
@@ -132,25 +145,27 @@ function tiktoks(){
   const F=[['all','All',all.length],['un','Unclaimed',un.length]];
   if(canMk)F.push(['mine','My claims',mine.length]);
   if(own)F.push(['pend','Needs approval',pend.length],['appr','To pay',appr.length]);
-  const f=F.some(x=>x[0]===S.ttf)?S.ttf:'all',list={all,un,mine,pend,appr}[f];
+  const f=F.some(x=>x[0]===S.ttf)?S.ttf:'all',q=S.q.trim().toLowerCase(),list={all,un,mine,pend,appr}[f].filter(t=>!q||(ttl(t)+' '+tau(t)+' '+t.id).toLowerCase().includes(q)),rt=me.rates.tiktok,nothumb=all.filter(t=>!t.thumb).length;
   for(const id of [...S.sel])if(!un.some(t=>t.id===id))S.sel.delete(id);
   const tiles=own?[[pend.length,'Waiting for your approval'],[rbx(sum(pend)),'Robux to approve'],[appr.length,'Approved, to pay'],[un.length,'Unclaimed']]
     :canMk?[[un.length,'Available to claim'],[mine.filter(t=>t.claim.status==='pending').length,'Waiting for approval'],[rbx(sum(mine.filter(t=>t.claim.status==='approved'))),'Approved, awaiting payment'],[rbx(sum(mine.filter(t=>t.claim.status==='paid'))),'Paid to you']]:[];
   const head=`${tiles.length?`<div class="stats">${tiles.map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('')}</div>`:''}
   ${mgr?`<div class="card"><form data-form="tt"><textarea name="urls" placeholder="Paste one or more TikTok links, one per line" required></textarea><div class="row" style="margin-top:8px"><button class="btn">Add TikToks</button><button class="btn line" type="button" data-sync="1">Sync from TikTok</button></div></form></div>`:''}
+  ${own&&!S.cfg.rates.tiktok?`<div class="hint"><b>The pay rate is R$0.</b> Set a default per TikTok under <a href="#" data-tab="pay">Payments</a>, or use <b>Set all pending to</b> below to fix claims already made.</div>`:''}
   <div class="pills">${F.map(([k,l,n])=>`<button class="pill" aria-pressed="${k===f}" data-ttf="${k}">${l}<i>${n}</i></button>`).join('')}</div>
-  <div class="tools">${canMk&&un.length?`<button class="btn line sm" data-selall="1">Select all unclaimed (${un.length})</button>`:''}${own&&pend.length?`<button class="btn sm" data-apprall="1" data-confirm="Approve all ${pend.length} pending claims (${rbx(sum(pend))} in total)?">Approve all pending (${pend.length})</button>`:''}${!canMk?'<span class="mut">Only Marketing staff can claim TikToks.</span>':''}</div>`;
+  <div class="tools"><input id="tq" class="search" type="search" placeholder="Search TikToks" value="${esc(S.q)}">${mgr&&nothumb?`<button class="btn line sm" data-refresh="1">Load missing previews (${nothumb})</button>`:''}${own&&pend.length?`<span class="mut">Set all pending to R$</span><input id="setall" type="number" min="0" value="${rt||50}" style="width:90px"><button class="btn line sm" data-setall="1">Apply</button>`:''}${canMk&&un.length?`<button class="btn line sm" data-selall="1">Select all unclaimed (${un.length})</button>`:''}${own&&pend.length?`<button class="btn sm" data-apprall="1" data-confirm="Approve all ${pend.length} pending claims (${rbx(sum(pend))} in total)?">Approve all pending (${pend.length})</button>`:''}${!canMk?'<span class="mut">Only Marketing staff can claim TikToks.</span>':''}</div>`;
   const card=t=>{const c=t.claim,m=c&&c.by===me.id,pick=canMk&&!c;
     const bd=c?`<span class="bd ${c.status}">${{pending:'Pending approval',approved:'Approved',paid:'Paid',rejected:'Rejected'}[c.status]}</span>`:`<span class="bd">Unclaimed</span>`;
-    const act=!c?(canMk?`<button class="btn" data-claim="${t.id}">Claim · ${rbx(me.rates.tiktok)}</button>`:''):
+    const act=!c?(canMk?`<button class="btn" data-claim="${t.id}">Claim${rt?' · '+rbx(rt):''}</button>`:''):
       `<div class="tm">Claimed by <b>${esc(c.name)}</b>${(m||own)&&c.amount!=null?' · '+rbx(c.amount):''}</div>`+
       (m&&c.status==='pending'?`<button class="btn line" data-del="tiktoks/${t.id}/claim">Withdraw my claim</button>`:'')+
       (own&&c.status==='pending'?`<div class="row"><button class="btn" data-decide="tiktoks:${t.id}:approve">Approve</button><button class="btn del" data-decide="tiktoks:${t.id}:reject">Reject</button></div>`:'')+
       (own&&c.status==='approved'?`<div class="row"><button class="btn" data-decide="tiktoks:${t.id}:paid">Mark paid</button><button class="btn del" data-decide="tiktoks:${t.id}:reject">Reject</button></div>`:'')+
       (own&&c.status!=='paid'?`<details><summary>Change amount</summary><div class="row"><input id="amt-${t.id}" type="number" min="0" value="${c.amount||0}"><button class="btn line sm" data-decide="tiktoks:${t.id}:amount">Save</button></div></details>`:'');
-    return `<div class="tc${S.sel.has(t.id)?' sel':''}"><a class="th" href="${esc(t.url)}" target="_blank" rel="noopener">${t.thumb?`<img src="${esc(t.thumb)}" alt="" loading="lazy">`:''}${bd}</a>
+    const num=/^\d+$/.test(String(t.id)),media=S.watch===t.id&&num?`<div class="th emb"><iframe src="https://www.tiktok.com/embed/v2/${t.id}" allow="fullscreen" loading="lazy"></iframe></div>`:t.thumb?`<a class="th" href="${esc(t.url)}" target="_blank" rel="noopener"><img src="${esc(t.thumb)}" alt="" loading="lazy">${bd}</a>`:num?`<button class="th ph0" data-watch="${t.id}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span class="w">Watch here</span>${bd}</button>`:`<a class="th ph0" href="${esc(t.url)}" target="_blank" rel="noopener"><span class="w">Open on TikTok</span>${bd}</a>`;
+    return `<div class="tc${S.sel.has(t.id)?' sel':''}">${media}
       ${pick?`<label class="pick"><input type="checkbox" data-pick="${t.id}" ${S.sel.has(t.id)?'checked':''} aria-label="Select"></label>`:''}
-      <div class="tb"><a class="tt" href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a><div class="tm">${esc(t.author)} · ${date(t.added)}</div>${act}
+      <div class="tb"><a class="tt" href="${esc(t.url)}" target="_blank" rel="noopener">${esc(ttl(t))}</a><div class="tm">${esc(tau(t)?'@'+tau(t):'')} · ${date(t.added)}</div>${act}
       ${own?`<button class="btn del sm" style="margin-top:auto" data-del="tiktoks/${t.id}" data-confirm="Delete this TikTok from the list?">Delete</button>`:''}</div></div>`};
   const bar=S.sel.size?`<div class="bar"><b>${S.sel.size} selected · ${rbx(S.sel.size*me.rates.tiktok)}</b><button class="btn" data-claimsel="1">Claim ${S.sel.size}</button><button class="btn line" data-clearsel="1">Clear</button></div>`:'';
   return head+(list.length?`<div class="tgrid">${list.map(card).join('')}</div>`:`<div class="empty">${f==='all'?'No TikToks yet. Add some above.':'Nothing here.'}</div>`)+bar}
@@ -167,18 +182,27 @@ function marketing(){
   ${c.note&&!S.me.owner?`<p class="mut">Owner note: ${esc(c.note)}</p>`:''}${decide('campaigns',c.id,c,true)}
   ${S.me.owner||['pending','rejected'].includes(c.status)?`<div style="margin-top:8px"><button class="btn del sm" data-del="campaigns/${c.id}" data-confirm="Delete this claim and its proof?">Delete</button></div>`:''}</div>`).join('')||'<p class="mut">No campaign claims yet.</p>'}`}
 
+function payCards(){
+  const P=[...S.pay].sort((a,b)=>b.owed-a.owed||b.pending-a.pending),due=P.filter(u=>u.owed>0),sm=k=>P.reduce((n,u)=>n+u[k],0);
+  S.paylist=due.map(u=>`${u.name}${u.roblox?' (@'+u.roblox+')':''}: ${rbx(u.owed)}`).join('\n');
+  return `<h2 style="margin:0 0 10px">Who to pay</h2><div class="stats"><div class="stat"><b>${rbx(sm('owed'))}</b><span>Owed to ${due.length} ${due.length===1?'person':'people'}</span></div><div class="stat"><b>${rbx(sm('pending'))}</b><span>Waiting for your approval</span></div><div class="stat"><b>${rbx(sm('paid'))}</b><span>Paid so far</span></div></div>
+  <div class="tools">${due.length?`<button class="btn line sm" data-copypay="1">Copy payout list</button>`:''}</div>
+  <div class="paygrid">${P.map(u=>{const o=u.items.filter(i=>i.status==='approved'),pn=u.items.filter(i=>i.status==='pending');
+    return `<div class="pc${u.owed?' due':''}"><div class="ph"><div><b>${esc(u.name)}</b><div class="tm">${u.roblox?`@${esc(u.roblox)} <button class="lnk" data-copytext="${esc(u.roblox)}">copy</button>`:'No Roblox name saved yet'}</div></div><div class="amt"><b>${rbx(u.owed)}</b><span>to pay</span></div></div>
+    <div class="tm">${pn.length?`${pn.length} waiting for approval (${rbx(u.pending)}) · `:''}${rbx(u.paid)} paid before${u.lastPaid?' · last '+date(u.lastPaid):''}</div>
+    ${o.length?`<details><summary>${o.length} approved item${o.length===1?'':'s'}</summary>${o.map(i=>`<div class="li"><span>${esc(i.what)}</span><b>${rbx(i.amount)}</b></div>`).join('')}</details>`:''}
+    <div class="row">${u.owed?`<button class="btn" data-payall="${u.id}" data-confirm="Mark ${rbx(u.owed)} as paid to ${esc(u.name)}? Send the Robux first.">Mark ${rbx(u.owed)} paid</button>`:''}${pn.length?`<button class="btn line" data-appperson="${u.id}">Approve ${pn.length} pending</button>`:''}</div></div>`}).join('')||'<div class="empty">No staff yet.</div>'}</div>`}
 function pay(){
   const mine=[...S.tt.filter(t=>t.claim&&t.claim.by===S.me.id).map(t=>({what:'TikTok: '+t.title,status:t.claim.status,amount:t.claim.amount,at:t.claim.at})),...S.camps.filter(c=>c.by===S.me.id).map(c=>({what:'Campaign: '+c.title,status:c.status,amount:c.amount,at:c.created}))].sort((a,b)=>b.at-a.at);
   const sum=st=>mine.filter(x=>x.status===st).reduce((n,x)=>n+(x.amount||0),0);
   let h=`<div class="grid"><div class="card"><h2>Your earnings</h2><p><b>${rbx(sum('approved'))}</b> owed to you<br><span class="mut">${rbx(sum('pending'))} waiting for approval · ${rbx(sum('paid'))} paid so far</span></p>
   <form class="row" data-form="profile"><input class="grow" name="roblox" placeholder="Your Roblox username (for payment)" value="${esc(S.me.roblox)}" maxlength="20"><button class="btn sm">Save</button></form></div>
   <div class="card"><h2>Your claims</h2>${mine.map(x=>`<div class="ann"><b>${esc(x.what)}</b> ${stTag(x.status)}<span class="tag">${rbx(x.amount)}</span></div>`).join('')||'<p class="mut">Nothing claimed yet.</p>'}</div></div>`;
+  if(S.me.owner)h=payCards()+h;
   if(S.me.owner)h+=`<div class="card"><h2>Pay rates (Robux)</h2><p class="mut">Default amount per approved item. You can override it for each person below, or change one claim's amount when you approve it. The amount is fixed when a claim is made.</p>
   <form class="row" data-form="rates"><label>Per TikTok <input name="tiktok" type="number" min="0" value="${S.cfg.rates.tiktok}" style="width:100px"></label><label>Per campaign <input name="campaign" type="number" min="0" value="${S.cfg.rates.campaign}" style="width:100px"></label><button class="btn sm">Save defaults</button></form></div>
-  <div class="card"><h2>Staff payments</h2><table><tr><th>Person</th><th>TikTok rate</th><th>Campaign rate</th><th>Pending</th><th>Owed</th><th>Paid</th><th></th></tr>
-  ${S.pay.map(u=>`<tr data-rate="${u.id}"><td><b>${esc(u.name)}</b><br><span class="mut">${u.roblox?'@'+esc(u.roblox):'no Roblox name yet'}</span></td>
-  <td><input data-k="tiktok" type="number" min="0" style="width:84px" placeholder="${S.cfg.rates.tiktok}" value="${u.rates.tiktok??''}"></td><td><input data-k="campaign" type="number" min="0" style="width:84px" placeholder="${S.cfg.rates.campaign}" value="${u.rates.campaign??''}"></td>
-  <td>${rbx(u.pending)}</td><td><b>${rbx(u.owed)}</b></td><td>${rbx(u.paid)}</td><td>${u.owed?`<button class="btn sm" data-payall="${u.id}" data-confirm="Mark everything owed to ${esc(u.name)} as paid? Send the Robux first.">Mark paid</button>`:''}</td></tr>`).join('')}</table><p class="mut">Blank rate = use the default. Approve claims in the TikToks and Marketing tabs, send the Robux, then press Mark paid.</p></div>`;
+  <div class="card"><h2>Custom rate per person</h2><table><tr><th>Person</th><th>TikTok rate</th><th>Campaign rate</th></tr>
+  ${S.pay.map(u=>`<tr data-rate="${u.id}"><td><b>${esc(u.name)}</b></td><td><input data-k="tiktok" type="number" min="0" style="width:84px" placeholder="${S.cfg.rates.tiktok}" value="${u.rates.tiktok??''}"></td><td><input data-k="campaign" type="number" min="0" style="width:84px" placeholder="${S.cfg.rates.campaign}" value="${u.rates.campaign??''}"></td></tr>`).join('')}</table><p class="mut">Leave blank to use the default rate.</p></div>`;
   return h}
 
 function links(){
@@ -209,13 +233,19 @@ function admin(){
   <td><button class="btn del sm" data-del="users/${u.id}" data-confirm="Remove ${esc(u.name)}?">Remove</button></td></tr>`).join('')}</table></div>`}
 
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall]');if(!t)return;
-  if(t.dataset.tab){S.tab=t.dataset.tab;S.err='';render()}
+  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall],[data-appperson],[data-copypay],[data-copytext],[data-watch],[data-refresh],[data-setall]');if(!t)return;
+  if(t.dataset.tab){e.preventDefault();S.tab=t.dataset.tab;S.err='';render()}
   else if(t.dataset.del){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(async()=>{const r=await api(t.dataset.del,'DELETE');if(r.games&&r.roles)S.cfg=r})}
   else if(t.dataset.move){const[id,st]=t.dataset.move.split(':');act(()=>api('items/'+id,'PATCH',{status:st}))}
   else if(t.dataset.claim){act(()=>api('tiktoks/'+t.dataset.claim+'/claim','POST',{}))}
   else if(t.dataset.decide){const[kind,id,action]=t.dataset.decide.split(':'),b={action,amount:$('#amt-'+id)?.value};if($('#note-'+id))b.note=$('#note-'+id).value;act(()=>api(kind+'/'+id,'PATCH',b))}
   else if(t.dataset.payall){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(()=>api('payouts','POST',{user:t.dataset.payall}))}
+  else if(t.dataset.watch){S.watch=S.watch===t.dataset.watch?'':t.dataset.watch;render()}
+  else if(t.dataset.appperson){act(()=>api('payouts','POST',{user:t.dataset.appperson,action:'approve'}))}
+  else if(t.dataset.copypay){navigator.clipboard?.writeText(S.paylist);t.textContent='Copied'}
+  else if(t.dataset.copytext){navigator.clipboard?.writeText(t.dataset.copytext);t.textContent='copied'}
+  else if(t.dataset.setall){const n=$('#setall').value;act(async()=>{const r=await api('tiktoks/setamount','POST',{amount:n});alert('Updated '+r.count+' pending claim'+(r.count===1?'':'s')+' to R$'+n+'.')})}
+  else if(t.dataset.refresh){act(async()=>{let ok=0;for(const x of S.tt.filter(x=>!x.thumb)){try{const r=await api('tiktoks/'+x.id+'/refresh','POST',{});if(r.thumb)ok++}catch(e){}}alert(ok?'Loaded '+ok+' preview'+(ok===1?'':'s')+'.':'TikTok did not return previews. You can still use Watch here on each card.')})}
   else if(t.dataset.ttf){S.ttf=t.dataset.ttf;render()}
   else if(t.dataset.selall){S.tt.filter(x=>!x.claim).forEach(x=>S.sel.add(x.id));render()}
   else if(t.dataset.clearsel){S.sel.clear();render()}
@@ -245,6 +275,7 @@ document.addEventListener('change',e=>{
   const row=e.target.closest('[data-user]');if(!row)return;
   const pick=a=>[...row.querySelectorAll(`[data-${a}]:checked`)].map(c=>c.dataset[a]);
   act(()=>api('users/'+row.dataset.user,'PUT',{games:pick('g'),roles:pick('r')}))});
-document.addEventListener('input',e=>{if(e.target.closest('#u-items,#u-title,#u-game'))buildUpdate()});
+document.addEventListener('input',e=>{if(e.target.id==='tq'){S.q=e.target.value;render();const i=$('#tq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}return}
+  if(e.target.closest('#u-items,#u-title,#u-game'))buildUpdate()});
 boot();
 </script></body></html>

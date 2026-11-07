@@ -46,6 +46,20 @@ async function getConfig(env) {
   return { ...c, rates: { tiktok: 0, campaign: 0, ...(c.rates || {}) } };
 }
 
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+// Ask TikTok for a video's title, author and thumbnail. Photo posts are retried as video links.
+async function fetchOembed(clean) {
+  const tries = [clean];
+  if (/\/photo\//.test(clean)) tries.push(clean.replace("/photo/", "/video/"));
+  for (const v of tries) {
+    try {
+      const r = await fetch("https://www.tiktok.com/oembed?url=" + encodeURIComponent(v), { headers: { "User-Agent": UA, Accept: "application/json" } });
+      if (r.ok) { const o = await r.json(); if (o && (o.title || o.thumbnail_url)) return o; }
+    } catch {}
+  }
+  return null;
+}
+
 // Add a TikTok to the list (used by the manual form and the automatic ingest webhook).
 async function addTikTok(env, raw, source, by, extra = {}) {
   let u;
@@ -56,10 +70,8 @@ async function addTikTok(env, raw, source, by, extra = {}) {
   const id = (clean.match(/\/(?:video|photo)\/(\d+)/) || [])[1] || slug(clean).slice(0, 80);
   if (await env.STAFF.get("tt:" + id)) return { error: "That TikTok is already on the list.", status: 409, duplicate: true };
   let title = "", author = "", thumb = "";
-  try {
-    const r = await fetch("https://www.tiktok.com/oembed?url=" + encodeURIComponent(clean));
-    if (r.ok) { const o = await r.json(); title = o.title || ""; author = o.author_name || ""; thumb = o.thumbnail_url || ""; }
-  } catch {}
+  const o = await fetchOembed(clean);
+  if (o) { title = o.title || ""; author = o.author_name || ""; thumb = o.thumbnail_url || ""; }
   const rec = {
     id, url: clean, title: clip(extra.title || title || "TikTok", 200), author: clip(author, 60),
     thumb: /^https:\/\//.test(thumb) ? thumb : "", added: Date.now(), by, source, claim: null
@@ -70,11 +82,15 @@ async function addTikTok(env, raw, source, by, extra = {}) {
 
 async function payouts(env) {
   const [tts, camps, users] = await Promise.all([listAll(env, "tt:"), listAll(env, "camp:"), listAll(env, "user:")]);
-  const claims = [...tts.filter(t => t.claim).map(t => ({ by: t.claim.by, status: t.claim.status, amount: t.claim.amount })), ...camps.map(x => ({ by: x.by, status: x.status, amount: x.amount }))];
-  return users.filter(u => u.id !== env.OWNER_DISCORD_ID && (u.roles.length || u.games.length)).map(u => {
-    const mine = claims.filter(x => x.by === u.id);
+  const items = [
+    ...tts.filter(t => t.claim).map(t => ({ kind: "tiktok", id: t.id, what: "TikTok: " + (t.title && t.title !== "TikTok" ? t.title : "…" + String(t.id).slice(-6)), by: t.claim.by, status: t.claim.status, amount: t.claim.amount || 0, at: t.claim.at || 0, paidAt: t.claim.paidAt || 0 })),
+    ...camps.map(x => ({ kind: "campaign", id: x.id, what: "Campaign: " + x.title, by: x.by, status: x.status, amount: x.amount || 0, at: x.created || 0, paidAt: x.paidAt || 0 }))
+  ];
+  const claimers = new Set(items.map(i => i.by));
+  return users.filter(u => u.id !== env.OWNER_DISCORD_ID && (u.roles.length || u.games.length || claimers.has(u.id))).map(u => {
+    const mine = items.filter(x => x.by === u.id && x.status !== "rejected").sort((x, y) => y.at - x.at);
     const sum = st => mine.filter(x => x.status === st).reduce((n, x) => n + (x.amount || 0), 0);
-    return { id: u.id, name: u.name, roblox: u.roblox || "", rates: { tiktok: u.rates?.tiktok ?? null, campaign: u.rates?.campaign ?? null }, pending: sum("pending"), owed: sum("approved"), paid: sum("paid") };
+    return { id: u.id, name: u.name, roblox: u.roblox || "", rates: { tiktok: u.rates?.tiktok ?? null, campaign: u.rates?.campaign ?? null }, pending: sum("pending"), owed: sum("approved"), paid: sum("paid"), lastPaid: Math.max(0, ...mine.map(x => x.paidAt || 0)), items: mine };
   });
 }
 async function listAll(env, prefix) {
@@ -262,7 +278,7 @@ export async function onRequest({ request, env }) {
       const user = TIKTOK_USER;
       let html = "";
       try {
-        const r = await fetch("https://www.tiktok.com/@" + user, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept-Language": "en-GB,en;q=0.9" } });
+        const r = await fetch("https://www.tiktok.com/@" + user, { headers: { "User-Agent": UA, "Accept-Language": "en-GB,en;q=0.9" } });
         html = await r.text();
       } catch { return fail("Could not reach TikTok.", 502); }
       const ids = new Set();
@@ -271,9 +287,24 @@ export async function onRequest({ request, env }) {
       const urls = [...ids].map(id => "https://www.tiktok.com/@" + user + "/video/" + id);
       return json({ urls, user });
     }
+    // Owner: set the Robux amount on every claim that is still waiting for approval.
+    if (b === "setamount" && method === "POST") {
+      if (!owner) return fail("Owner only.", 403);
+      const n = int(body.amount);
+      if (n === null) return fail("Enter a number of Robux.");
+      let count = 0;
+      for (const x of await listAll(env, "tt:")) if (x.claim && x.claim.status === "pending") { x.claim.amount = n; await env.STAFF.put("tt:" + x.id, JSON.stringify(x)); count++; }
+      return json({ ok: true, count });
+    }
     const t = JSON.parse((await env.STAFF.get("tt:" + b)) || "null");
     if (!t) return fail("Not found.", 404);
     const save = async () => { await env.STAFF.put("tt:" + t.id, JSON.stringify(t)); return json(t); };
+    if (c === "refresh" && method === "POST") {
+      if (!(owner || marketing || lead)) return fail("Not allowed.", 403);
+      const o = await fetchOembed(t.url);
+      if (o) { if (o.title) t.title = clip(o.title, 200); if (o.author_name) t.author = clip(o.author_name, 60); if (/^https:\/\//.test(o.thumbnail_url || "")) t.thumb = o.thumbnail_url; }
+      return save();
+    }
     if (c === "claim" && method === "POST") {
       if (!marketing) return fail("Only marketing staff can claim TikToks.", 403);
       if (t.claim) return fail("Already claimed by " + t.claim.name + ".");
@@ -346,7 +377,10 @@ export async function onRequest({ request, env }) {
   // ---- Payments (owner) ----
   if (a === "payouts") {
     if (!owner) return fail("Owner only.", 403);
-    if (method === "POST") {
+    if (method === "POST" && body.action === "approve") {
+      for (const t of await listAll(env, "tt:")) if (t.claim && t.claim.by === body.user && t.claim.status === "pending") { t.claim.status = "approved"; await env.STAFF.put("tt:" + t.id, JSON.stringify(t)); }
+      for (const x of await listAll(env, "camp:")) if (x.by === body.user && x.status === "pending") { x.status = "approved"; await env.STAFF.put("camp:" + x.id, JSON.stringify(x)); }
+    } else if (method === "POST") {
       for (const t of await listAll(env, "tt:")) if (t.claim && t.claim.by === body.user && t.claim.status === "approved") { t.claim.status = "paid"; t.claim.paidAt = Date.now(); await env.STAFF.put("tt:" + t.id, JSON.stringify(t)); }
       for (const x of await listAll(env, "camp:")) if (x.by === body.user && x.status === "approved") { x.status = "paid"; x.paidAt = Date.now(); await env.STAFF.put("camp:" + x.id, JSON.stringify(x)); }
     }
