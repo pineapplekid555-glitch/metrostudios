@@ -387,3 +387,10 @@ a.n-row:hover>svg{transform:translateX(5px);color:var(--text)}
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* tap-targets: larger touch areas on phones */
+@media (max-width:700px){
+  .foot ul a{display:inline-block;padding:7px 0}
+  .link,.prose a{padding:4px 0}
+  .btn{min-height:48px}
+}

@@ -191,9 +191,10 @@ export async function onRequest({ request, env }) {
   // Owner decisions on a payment claim: approve, mark paid, reject, or just change the amount.
   const decide = (o, body) => {
     const amt = int(body.amount);
-    if (amt !== null && o.status !== "paid") o.amount = amt;
+    if (amt !== null) o.amount = amt;
     const act = body.action;
     if (act === "approve" && o.status === "pending") o.status = "approved";
+    else if (act === "reopen" && o.status === "paid") { o.status = "approved"; delete o.paidAt; }
     else if (act === "paid" && o.status === "approved") { o.status = "paid"; o.paidAt = Date.now(); }
     else if (act === "reject" && o.status !== "paid") return "reject";
     else if (act !== "amount") return "invalid";
