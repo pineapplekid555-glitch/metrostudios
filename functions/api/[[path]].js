@@ -275,7 +275,7 @@ export async function onRequest({ request, env }) {
     if (!t) return fail("Not found.", 404);
     const save = async () => { await env.STAFF.put("tt:" + t.id, JSON.stringify(t)); return json(t); };
     if (c === "claim" && method === "POST") {
-      if (!myRoles.includes("marketing")) return fail("Only marketing staff can claim TikToks.", 403);
+      if (!marketing) return fail("Only marketing staff can claim TikToks.", 403);
       if (t.claim) return fail("Already claimed by " + t.claim.name + ".");
       t.claim = { by: uid, name: me.name, at: Date.now(), amount: rateFor(me, "tiktok"), status: "pending" };
       return save();

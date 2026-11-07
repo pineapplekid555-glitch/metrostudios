@@ -33,6 +33,26 @@ textarea{width:100%;min-height:70px}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top;font-size:14px}
 label.chk{display:inline-flex;gap:4px;align-items:center;margin:0 10px 4px 0;font-size:13px}
 pre{background:var(--bg);border:1px solid var(--line);padding:12px;overflow-x:auto;font-size:13px}
+.card,.it{border-radius:10px}.btn,input,select,textarea{border-radius:8px}.btn{transition:opacity .15s,transform .1s}.btn:hover{opacity:.88}.btn:active{transform:scale(.98)}
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.stat b{display:block;font-size:1.6rem;line-height:1.2}.stat span{color:var(--mut);font-size:13px}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+.pill{border:1px solid var(--line);background:none;color:var(--mut);border-radius:99px;padding:7px 14px;font:inherit;cursor:pointer}
+.pill[aria-pressed=true]{background:var(--ac);color:var(--bg);border-color:var(--ac);font-weight:600}.pill i{font-style:normal;opacity:.7;margin-left:6px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 16px}
+.tgrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.tc{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.tc.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.th{position:relative;display:block;aspect-ratio:3/4;background:linear-gradient(135deg,#1d1d23,#2b2b35)}.th img{width:100%;height:100%;object-fit:cover;display:block}
+.bd{position:absolute;left:8px;top:8px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.7);color:#fff}
+.bd.pending{background:var(--amb);color:#000}.bd.approved{background:#2f81f7;color:#fff}.bd.paid{background:var(--grn);color:#fff}
+.pick{position:absolute;right:8px;top:8px;background:rgba(0,0,0,.55);border-radius:8px;padding:5px 6px;display:flex}.pick input{width:20px;height:20px;margin:0;accent-color:#fff;cursor:pointer}
+.tb{padding:12px;display:flex;flex-direction:column;gap:8px;flex:1}
+.tt{font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none}
+.tm{color:var(--mut);font-size:12px}.tb .btn{width:100%;text-align:center;padding:10px}.tb .row .btn{flex:1}
+.tb details summary{cursor:pointer;color:var(--mut);font-size:12px}.tb details .row{margin-top:6px}.tb details input{width:90px}
+.bar{position:sticky;bottom:14px;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--ac);border-radius:12px;padding:10px 14px;margin-top:16px;box-shadow:0 8px 30px rgba(0,0,0,.35)}.bar b{flex:1 1 auto}
+.empty{text-align:center;padding:40px 10px;color:var(--mut)}
 .center{max-width:460px;margin:12vh auto;text-align:center;padding:0 18px}.err{color:var(--red)}
 </style></head><body>
 <header><div class="wrap"><b>Metro Studios <span class="mut">/ Staff</span></b><span class="sp"></span><div class="who" id="who"></div></div></header>
@@ -40,7 +60,7 @@ pre{background:var(--bg);border:1px solid var(--line);padding:12px;overflow-x:au
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API=location.pathname.replace(/staff(\/(index\.html)?)?$/,'')+'api/',NOAPI='NO_API';
-const S={me:null,cfg:null,d:null,users:[],tab:'home',game:'',err:''};
+const S={ttf:'all',sel:new Set(),me:null,cfg:null,d:null,users:[],tab:'home',game:'',err:''};
 async function api(p,m='GET',b){
   const r=await fetch(API+p,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
   const j=await r.json().catch(()=>null);
@@ -106,13 +126,34 @@ const decide=(kind,id,o,note)=>S.me.owner?`<div class="row" style="margin-top:8p
   ${o.status==='pending'?`<button class="btn sm" data-decide="${kind}:${id}:approve">Approve</button>`:''}${o.status==='approved'?`<button class="btn sm" data-decide="${kind}:${id}:paid">Mark paid</button>`:''}${o.status==='paid'?'':`<button class="btn del sm" data-decide="${kind}:${id}:reject">Reject</button>`}</div>`:'';
 
 function tiktoks(){
-  const canMk=S.me.roles.includes('marketing');
-  const add=(S.me.owner||S.me.marketing||S.me.lead)?`<div class="card"><form data-form="tt"><textarea name="urls" placeholder="Paste one or more TikTok links, one per line" required></textarea><div class="row" style="margin-top:8px"><button class="btn">Add TikToks</button><button class="btn line" type="button" data-sync="1">Sync from TikTok</button></div></form><p class="mut" style="margin:8px 0 0"><b>Sync from TikTok</b> pulls in the videos from @metrostudiosoffical that TikTok shows publicly. If an older one is missed, paste its link above. Only Marketing staff can press <b>I made this</b>, and every claim waits for the owner to approve it.</p></div>`:`<p class="mut">${canMk?`Made one of these? Press <b>I made this</b> to claim your payment (${rbx(S.me.rates.tiktok)} each). The owner approves it before it is paid.`:'Only Marketing staff can claim TikToks.'}</p>`;
-  return add+`<div class="grid">${S.tt.map(t=>{const c=t.claim,mine=c&&c.by===S.me.id;
-    return `<div class="card" style="margin:0">${t.thumb?`<img src="${esc(t.thumb)}" alt="" style="width:100%;height:170px;object-fit:cover;margin-bottom:8px">`:''}
-    <a href="${esc(t.url)}" target="_blank" rel="noopener"><b>${esc(t.title)}</b></a><br><span class="mut">${esc(t.author)} · added ${date(t.added)}${t.source==='auto'?' · automatic':''}</span>
-    <div style="margin-top:8px">${!c?(canMk?`<button class="btn sm" data-claim="${t.id}">I made this · ${rbx(S.me.rates.tiktok)}</button>`:`<span class="tag">Unclaimed</span>`):`<span class="tag">Claimed by ${esc(c.name)}</span>${stTag(c.status)}${(mine||S.me.owner)&&c.amount!=null?`<span class="tag">${rbx(c.amount)}</span>`:''}${mine&&c.status==='pending'?` <button class="btn del sm" data-del="tiktoks/${t.id}/claim">Withdraw</button>`:''}`}</div>
-    ${c?decide('tiktoks',t.id,c):''}${S.me.owner?`<div style="margin-top:8px"><button class="btn del sm" data-del="tiktoks/${t.id}" data-confirm="Delete this TikTok from the list?">Delete</button></div>`:''}</div>`}).join('')||'<p class="mut">No TikToks yet.</p>'}</div>`}
+  const me=S.me,own=me.owner,canMk=own||me.roles.includes('marketing'),mgr=own||me.marketing||me.lead,all=S.tt;
+  const un=all.filter(t=>!t.claim),mine=all.filter(t=>t.claim&&t.claim.by===me.id),pend=all.filter(t=>t.claim&&t.claim.status==='pending'),appr=all.filter(t=>t.claim&&t.claim.status==='approved');
+  const sum=l=>l.reduce((n,t)=>n+(t.claim&&t.claim.amount||0),0);
+  const F=[['all','All',all.length],['un','Unclaimed',un.length]];
+  if(canMk)F.push(['mine','My claims',mine.length]);
+  if(own)F.push(['pend','Needs approval',pend.length],['appr','To pay',appr.length]);
+  const f=F.some(x=>x[0]===S.ttf)?S.ttf:'all',list={all,un,mine,pend,appr}[f];
+  for(const id of [...S.sel])if(!un.some(t=>t.id===id))S.sel.delete(id);
+  const tiles=own?[[pend.length,'Waiting for your approval'],[rbx(sum(pend)),'Robux to approve'],[appr.length,'Approved, to pay'],[un.length,'Unclaimed']]
+    :canMk?[[un.length,'Available to claim'],[mine.filter(t=>t.claim.status==='pending').length,'Waiting for approval'],[rbx(sum(mine.filter(t=>t.claim.status==='approved'))),'Approved, awaiting payment'],[rbx(sum(mine.filter(t=>t.claim.status==='paid'))),'Paid to you']]:[];
+  const head=`${tiles.length?`<div class="stats">${tiles.map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('')}</div>`:''}
+  ${mgr?`<div class="card"><form data-form="tt"><textarea name="urls" placeholder="Paste one or more TikTok links, one per line" required></textarea><div class="row" style="margin-top:8px"><button class="btn">Add TikToks</button><button class="btn line" type="button" data-sync="1">Sync from TikTok</button></div></form></div>`:''}
+  <div class="pills">${F.map(([k,l,n])=>`<button class="pill" aria-pressed="${k===f}" data-ttf="${k}">${l}<i>${n}</i></button>`).join('')}</div>
+  <div class="tools">${canMk&&un.length?`<button class="btn line sm" data-selall="1">Select all unclaimed (${un.length})</button>`:''}${own&&pend.length?`<button class="btn sm" data-apprall="1" data-confirm="Approve all ${pend.length} pending claims (${rbx(sum(pend))} in total)?">Approve all pending (${pend.length})</button>`:''}${!canMk?'<span class="mut">Only Marketing staff can claim TikToks.</span>':''}</div>`;
+  const card=t=>{const c=t.claim,m=c&&c.by===me.id,pick=canMk&&!c;
+    const bd=c?`<span class="bd ${c.status}">${{pending:'Pending approval',approved:'Approved',paid:'Paid',rejected:'Rejected'}[c.status]}</span>`:`<span class="bd">Unclaimed</span>`;
+    const act=!c?(canMk?`<button class="btn" data-claim="${t.id}">Claim · ${rbx(me.rates.tiktok)}</button>`:''):
+      `<div class="tm">Claimed by <b>${esc(c.name)}</b>${(m||own)&&c.amount!=null?' · '+rbx(c.amount):''}</div>`+
+      (m&&c.status==='pending'?`<button class="btn line" data-del="tiktoks/${t.id}/claim">Withdraw my claim</button>`:'')+
+      (own&&c.status==='pending'?`<div class="row"><button class="btn" data-decide="tiktoks:${t.id}:approve">Approve</button><button class="btn del" data-decide="tiktoks:${t.id}:reject">Reject</button></div>`:'')+
+      (own&&c.status==='approved'?`<div class="row"><button class="btn" data-decide="tiktoks:${t.id}:paid">Mark paid</button><button class="btn del" data-decide="tiktoks:${t.id}:reject">Reject</button></div>`:'')+
+      (own&&c.status!=='paid'?`<details><summary>Change amount</summary><div class="row"><input id="amt-${t.id}" type="number" min="0" value="${c.amount||0}"><button class="btn line sm" data-decide="tiktoks:${t.id}:amount">Save</button></div></details>`:'');
+    return `<div class="tc${S.sel.has(t.id)?' sel':''}"><a class="th" href="${esc(t.url)}" target="_blank" rel="noopener">${t.thumb?`<img src="${esc(t.thumb)}" alt="" loading="lazy">`:''}${bd}</a>
+      ${pick?`<label class="pick"><input type="checkbox" data-pick="${t.id}" ${S.sel.has(t.id)?'checked':''} aria-label="Select"></label>`:''}
+      <div class="tb"><a class="tt" href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.title)}</a><div class="tm">${esc(t.author)} · ${date(t.added)}</div>${act}
+      ${own?`<button class="btn del sm" style="margin-top:auto" data-del="tiktoks/${t.id}" data-confirm="Delete this TikTok from the list?">Delete</button>`:''}</div></div>`};
+  const bar=S.sel.size?`<div class="bar"><b>${S.sel.size} selected · ${rbx(S.sel.size*me.rates.tiktok)}</b><button class="btn" data-claimsel="1">Claim ${S.sel.size}</button><button class="btn line" data-clearsel="1">Clear</button></div>`:'';
+  return head+(list.length?`<div class="tgrid">${list.map(card).join('')}</div>`:`<div class="empty">${f==='all'?'No TikToks yet. Add some above.':'Nothing here.'}</div>`)+bar}
 
 function marketing(){
   return `<div class="card"><h2>Claim a marketing campaign</h2><p class="mut">Describe what you did and attach proof (screenshots and/or links). You are paid ${rbx(S.me.rates.campaign)} per approved campaign.</p>
@@ -168,13 +209,18 @@ function admin(){
   <td><button class="btn del sm" data-del="users/${u.id}" data-confirm="Remove ${esc(u.name)}?">Remove</button></td></tr>`).join('')}</table></div>`}
 
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync]');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall]');if(!t)return;
   if(t.dataset.tab){S.tab=t.dataset.tab;S.err='';render()}
   else if(t.dataset.del){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(async()=>{const r=await api(t.dataset.del,'DELETE');if(r.games&&r.roles)S.cfg=r})}
   else if(t.dataset.move){const[id,st]=t.dataset.move.split(':');act(()=>api('items/'+id,'PATCH',{status:st}))}
   else if(t.dataset.claim){act(()=>api('tiktoks/'+t.dataset.claim+'/claim','POST',{}))}
   else if(t.dataset.decide){const[kind,id,action]=t.dataset.decide.split(':'),b={action,amount:$('#amt-'+id)?.value};if($('#note-'+id))b.note=$('#note-'+id).value;act(()=>api(kind+'/'+id,'PATCH',b))}
   else if(t.dataset.payall){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(()=>api('payouts','POST',{user:t.dataset.payall}))}
+  else if(t.dataset.ttf){S.ttf=t.dataset.ttf;render()}
+  else if(t.dataset.selall){S.tt.filter(x=>!x.claim).forEach(x=>S.sel.add(x.id));render()}
+  else if(t.dataset.clearsel){S.sel.clear();render()}
+  else if(t.dataset.claimsel){act(async()=>{const bad=[];for(const id of [...S.sel]){try{await api('tiktoks/'+id+'/claim','POST',{})}catch(e){bad.push(e.message)}}S.sel.clear();if(bad.length)alert('Some could not be claimed:\n'+[...new Set(bad)].join('\n'))})}
+  else if(t.dataset.apprall){if(!confirm(t.dataset.confirm))return;act(async()=>{for(const x of S.tt.filter(x=>x.claim&&x.claim.status==='pending')){try{await api('tiktoks/'+x.id,'PATCH',{action:'approve'})}catch(e){}}})}
   else if(t.dataset.sync){act(async()=>{const r=await api('tiktoks/discover','POST',{});if(!r.urls.length){alert('TikTok did not show any videos for @'+r.user+'. Paste the links in the box instead.');return}await addMany(r.urls)})}
   else if(t.dataset.copy){navigator.clipboard?.writeText($('#u-out').textContent);t.textContent='Copied'}});
 document.addEventListener('submit',e=>{
@@ -192,6 +238,7 @@ async function addMany(urls){
   alert(`Added ${added}. Already on the list: ${dupes}.`+(bad.length?`\nCould not add:\n`+bad.join('\n'):''))}
 async function shrink(file){const bm=await createImageBitmap(file),sc=Math.min(1,1280/Math.max(bm.width,bm.height)),c=document.createElement('canvas');c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.8)}
 document.addEventListener('change',e=>{
+  if(e.target.dataset&&e.target.dataset.pick){const i=e.target.dataset.pick;e.target.checked?S.sel.add(i):S.sel.delete(i);render();return}
   if(e.target.matches('[data-filter]')){S.game=e.target.value;render();return}
   const rr=e.target.closest('[data-rate]');
   if(rr){const g=k=>rr.querySelector(`[data-k=${k}]`).value;act(()=>api('rates','PUT',{user:rr.dataset.rate,tiktok:g('tiktok'),campaign:g('campaign')}));return}
