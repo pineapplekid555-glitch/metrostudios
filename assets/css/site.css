@@ -245,7 +245,7 @@ h3{font-weight:700;font-size:1.2rem;line-height:1.25}
 .page-head .lead{margin-top:clamp(18px,2.4vw,28px)}
 .about-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:clamp(28px,5vw,80px);align-items:center}
 .about-grid .prose{grid-column:1/7}
-.about-grid .glow{grid-column:8/13;aspect-ratio:1100/751;background:var(--img-glow) center/contain no-repeat}
+.about-grid .glow{grid-column:8/13;aspect-ratio:900/709;background:var(--img-logo) center/contain no-repeat;opacity:.9;filter:drop-shadow(0 0 24px rgba(255,255,255,.12))}
 .find{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line)}
 .find a{display:grid;gap:6px;padding:24px 24px 24px 0;text-decoration:none;border-bottom:1px solid var(--line)}
 .find a+a{padding-left:24px;border-left:1px solid var(--line)}
