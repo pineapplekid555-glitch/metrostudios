@@ -47,7 +47,9 @@
   var STATUS = { live: 'Out now', soon: 'Coming soon', testing: 'In testing', dev: 'In development' };
   var SLUGS = { 'westbrook-county': 'Westbrook County', 'project-alba': 'Project Alba', 'oath-of-caledonia': 'Oath of Caledonia' };
   var KEYS = {
-    top: ['links', 'games', 'news', 'team'],
+    top: ['links', 'games', 'news', 'team', 'banner', 'faq'],
+    banner: ['text', 'link', 'linkText'],
+    faq: ['q', 'a'],
     links: ['discord', 'group', 'tiktok'],
     game: ['status', 'release', 'play', 'website', 'screenshots'],
     shot: ['image', 'caption', 'alt'],
@@ -73,6 +75,8 @@
   function validate(S) {
     if (!S || typeof S !== 'object') { bad('content.js loaded, but it does not define window.SITE.', 'The file should start with window.SITE = { and end with };'); return; }
     keys(S, 'top', 'the top level');
+    if (S.banner != null) { if (typeof S.banner !== 'object' || Array.isArray(S.banner)) bad('banner must be a group { ... }.', 'Example: banner: { text: "Update is live", link: "", linkText: "Read more" }'); else keys(S.banner, 'banner', 'banner'); }
+    if (S.faq != null) { if (!Array.isArray(S.faq)) bad('faq must be a list [ ... ].', 'Each question looks like { q: "Question?", a: "Answer." }'); else S.faq.forEach(function (f, i) { if (!f || typeof f !== 'object') return bad('faq item ' + (i + 1) + ' is not a { ... } block.'); keys(f, 'faq', 'faq item ' + (i + 1)); if (!isStr(f.q) || !f.q.trim() || !isStr(f.a) || !f.a.trim()) warn('faq item ' + (i + 1) + ' needs both a q (question) and an a (answer).'); }); }
 
     var L = S.links || {};
     keys(L, 'links', 'links');
