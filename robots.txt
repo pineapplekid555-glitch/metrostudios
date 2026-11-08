@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /staff/
+Disallow: /api/
+Disallow: /content-check/
+
+Sitemap: https://metrostudios.pages.dev/sitemap.xml

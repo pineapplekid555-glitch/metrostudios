@@ -126,14 +126,14 @@ function loginScreen(m){
 async function load(){
   {const m=await api('me');S.me=m.user;S.cfg=m.config}
   S.d=await api('data');if(S.me.owner||S.me.lead)S.users=(await api('users')).users;
-  S.tt=(await api('tiktoks')).tiktoks;S.camps=(await api('campaigns')).campaigns;if(S.me.owner)S.pay=(await api('payouts')).people;render()}
+  S.tt=(await api('tiktoks')).tiktoks;S.camps=(await api('campaigns')).campaigns;if(S.me.owner){S.pay=(await api('payouts')).people;S.apps=(await api('applications')).applications}render()}
 async function act(fn){try{S.err='';await fn();await load()}catch(e){S.err=e.message;render()}}
 
 function render(){
-  const tabs=[['home','Home'],['tasks','Tasks'],['bugs','Bugs'],['tiktoks','TikToks']];if(S.me.marketing)tabs.push(['marketing','Marketing']);tabs.push(['pay','Payments'],['links','Links'],['tools','Update writer']);
+  const tabs=[['home','Home'],['tasks','Tasks'],['bugs','Bugs'],['tiktoks','TikToks']];if(S.me.marketing)tabs.push(['marketing','Marketing']);tabs.push(['pay','Payments']);if(S.me.owner)tabs.push(['apps','Applications']);tabs.push(['links','Links'],['tools','Update writer']);
   if(S.me.owner)tabs.push(['admin','Admin']);else if(S.me.lead)tabs.push(['admin','My team']);
-  const owe=S.me.owner?(S.pay||[]).filter(u=>u.owed||u.pending).length:0,bdg={tiktoks:S.me.owner?S.tt.filter(t=>t.claim&&t.claim.status==='pending').length:0,marketing:S.me.owner?S.camps.filter(c=>c.status==='pending').length:0,pay:owe};
-  const body={home,tasks:()=>board('task'),bugs:()=>board('bug'),tiktoks,marketing,pay,links,tools,admin}[S.tab]();
+  const owe=S.me.owner?(S.pay||[]).filter(u=>u.owed||u.pending).length:0,bdg={tiktoks:S.me.owner?S.tt.filter(t=>t.claim&&t.claim.status==='pending').length:0,marketing:S.me.owner?S.camps.filter(c=>c.status==='pending').length:0,pay:owe,apps:S.me.owner?(S.apps||[]).filter(a=>a.status==='new').length:0};
+  const body={home,tasks:()=>board('task'),bugs:()=>board('bug'),tiktoks,marketing,pay,apps,links,tools,admin}[S.tab]();
   $('#app').innerHTML=`<h1>Hello, ${esc(S.me.name)}</h1><div class="mut">${S.me.owner?'Owner':S.me.games.map(gname).join(', ')}${S.me.roles.length?' · '+S.me.roles.map(rname).join(', '):''}</div>
   <nav class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${k===S.tab}" data-tab="${k}">${l}${bdg[k]?`<span class="nb">${bdg[k]}</span>`:''}</button>`).join('')}</nav>
   ${S.err?`<p class="err">${esc(S.err)}</p>`:''}${body}`}
@@ -145,6 +145,7 @@ function attention(){
     if(pt)rows.push([pt,'TikTok claims waiting for approval','tiktoks','Review']);
     if(pc)rows.push([pc,'Campaign claims waiting for approval','marketing','Review']);
     if(ow)rows.push([rbx(owed),`owed to ${ow} ${ow===1?'person':'people'}`,'pay','Pay']);
+    const na=(S.apps||[]).filter(a=>a.status==='new').length;if(na)rows.push([na,'new staff application'+(na===1?'':'s'),'apps','Review']);
     if(un)rows.push([un,'TikToks nobody has claimed yet','tiktoks','View']);
   }else if(me.roles.includes('marketing')){
     const un=S.tt.filter(t=>!t.claim).length,mine=S.tt.filter(t=>t.claim&&t.claim.by===me.id);
@@ -252,6 +253,21 @@ function downloadCsv(){
   const rows=[['Date paid','Status','Person','Roblox username','Type','Item','Robux']];
   S.pay.forEach(u=>u.items.forEach(i=>rows.push([d(i.paidAt),i.status,u.name,u.roblox,i.kind,i.what,i.amount])));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv'}));a.download='metro-studios-payments-'+d(Date.now())+'.csv';document.body.appendChild(a);a.click();a.remove()}
+const AST={new:'New',reviewing:'Reviewing',accepted:'Accepted',declined:'Declined'};
+function apps(){
+  const all=S.apps||[],f=S.af||'all',q=(S.aq||'').trim().toLowerCase(),cnt=k=>k==='all'?all.length:all.filter(a=>a.status===k).length,
+    list=all.filter(a=>f==='all'||a.status===f).filter(a=>!q||[a.discord,a.roblox,a.role,a.game,a.experience,a.why].join(' ').toLowerCase().includes(q));
+  return `<div class="card"><h2>Staff applications</h2><p class="mut">People apply on the public <b>Join us</b> page. Only you can see these. Message accepted people on Discord, then delete the application when you are done with it.</p></div>
+  <div class="pills">${[['all','All'],['new','New'],['reviewing','Reviewing'],['accepted','Accepted'],['declined','Declined']].map(([k,l])=>`<button class="pill" aria-pressed="${f===k}" data-af="${k}">${l}<i>${cnt(k)}</i></button>`).join('')}</div>
+  <div class="tools"><input id="aq" class="search" type="search" placeholder="Search applications" value="${esc(S.aq||'')}"></div>
+  ${list.map(a=>`<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b style="font-size:1.1rem">${esc(a.discord)}</b> <button class="lnk" data-copytext="${esc(a.discord)}">copy</button><div class="tm">Roblox: <a href="https://www.roblox.com/users/profile?username=${encodeURIComponent(a.roblox)}" target="_blank" rel="noopener">@${esc(a.roblox)}</a> · ${date(a.created)}</div></div><span class="tag">${AST[a.status]||a.status}</span></div>
+    <p style="margin:10px 0 4px"><span class="tag">${esc(a.role)}</span><span class="tag">${esc(a.game||'Any game')}</span></p>
+    <p class="mut" style="margin:10px 0 2px">Experience</p><p style="white-space:pre-wrap;margin:0">${esc(a.experience)}</p>
+    <p class="mut" style="margin:10px 0 2px">Why they want to join</p><p style="white-space:pre-wrap;margin:0">${esc(a.why)}</p>
+    ${a.portfolio?`<p style="margin:10px 0 0"><a href="${esc(a.portfolio)}" target="_blank" rel="noopener">${esc(a.portfolio)}</a></p>`:''}
+    <textarea data-appnote="${a.id}" placeholder="Your private notes" style="margin-top:10px">${esc(a.note||'')}</textarea>
+    <div class="row" style="margin-top:8px">${['reviewing','accepted','declined'].filter(k=>k!==a.status).map(k=>`<button class="btn ${k==='declined'?'line':k==='accepted'?'':'line'} sm" data-appst="${a.id}:${k}">${{reviewing:'Mark reviewing',accepted:'Accept',declined:'Decline'}[k]}</button>`).join('')}<button class="btn del sm" data-del="applications/${a.id}" data-confirm="Delete this application for good?">Delete</button></div></div>`).join('')||'<div class="empty">No applications here yet.</div>'}`}
+
 function payCards(){
   const P=[...S.pay].sort((a,b)=>b.owed-a.owed||b.pending-a.pending),due=P.filter(u=>u.owed>0),sm=k=>P.reduce((n,u)=>n+u[k],0);
   S.paylist=due.map(u=>`${u.name}${u.roblox?' (@'+u.roblox+')':''}: ${rbx(u.owed)}`).join('\n');
@@ -303,13 +319,15 @@ function admin(){
   <td><button class="btn del sm" data-del="users/${u.id}" data-confirm="Remove ${esc(u.name)}?">Remove</button></td></tr>`).join('')}</table></div>`}
 
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall],[data-appperson],[data-copypay],[data-copytext],[data-watch],[data-refresh],[data-setall],[data-cf],[data-checkdup],[data-csv],[data-hall],[data-appcamps]');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall],[data-appperson],[data-copypay],[data-copytext],[data-watch],[data-refresh],[data-setall],[data-cf],[data-checkdup],[data-csv],[data-hall],[data-appcamps],[data-af],[data-appst]');if(!t)return;
   if(t.dataset.tab){e.preventDefault();S.tab=t.dataset.tab;S.err='';render()}
   else if(t.dataset.del){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(async()=>{const r=await api(t.dataset.del,'DELETE');if(r.games&&r.roles)S.cfg=r})}
   else if(t.dataset.move){const[id,st]=t.dataset.move.split(':');act(()=>api('items/'+id,'PATCH',{status:st}))}
   else if(t.dataset.claim){act(()=>api('tiktoks/'+t.dataset.claim+'/claim','POST',{}))}
   else if(t.dataset.decide){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;const[kind,id,action]=t.dataset.decide.split(':'),b={action,amount:$('#amt-'+id)?.value};if($('#note-'+id))b.note=$('#note-'+id).value;act(()=>api(kind+'/'+id,'PATCH',b))}
   else if(t.dataset.payall){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(()=>api('payouts','POST',{user:t.dataset.payall}))}
+  else if(t.dataset.af){S.af=t.dataset.af;render()}
+  else if(t.dataset.appst){const[id,st]=t.dataset.appst.split(':');act(()=>api('applications/'+id,'PATCH',{status:st}))}
   else if(t.dataset.csv){downloadCsv()}
   else if(t.dataset.hall){S.hall=!S.hall;render()}
   else if(t.dataset.appcamps){if(!confirm(t.dataset.confirm))return;act(async()=>{for(const c of S.camps.filter(c=>c.status==='pending')){try{await api('campaigns/'+c.id,'PATCH',{action:'approve'})}catch(e){}}})}
@@ -346,13 +364,15 @@ async function shrink(file){const bm=await createImageBitmap(file),sc=Math.min(1
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.pick){const i=e.target.dataset.pick;e.target.checked?S.sel.add(i):S.sel.delete(i);render();return}
   if(e.target.name==='ctype'){const f=e.target.closest('form');S.ct=e.target.value;f.dataset.t=S.ct;f.querySelectorAll('.pill').forEach(l=>l.setAttribute('aria-pressed',String(l.contains(e.target))));const o=$('#dupres');if(o)o.textContent='';return}
+  if(e.target.dataset&&e.target.dataset.appnote){const id=e.target.dataset.appnote,v=e.target.value;act(()=>api('applications/'+id,'PATCH',{note:v}));return}
   if(e.target.matches('[data-filter]')){S.game=e.target.value;render();return}
   const rr=e.target.closest('[data-rate]');
   if(rr){const g=k=>rr.querySelector(`[data-k=${k}]`).value;act(()=>api('rates','PUT',{user:rr.dataset.rate,tiktok:g('tiktok'),campaign:g('campaign')}));return}
   const row=e.target.closest('[data-user]');if(!row)return;
   const pick=a=>[...row.querySelectorAll(`[data-${a}]:checked`)].map(c=>c.dataset[a]);
   act(()=>api('users/'+row.dataset.user,'PUT',{games:pick('g'),roles:pick('r')}))});
-document.addEventListener('input',e=>{if(e.target.id==='cq'){S.cq=e.target.value;render();const i=$('#cq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}return}
+document.addEventListener('input',e=>{if(e.target.id==='aq'){S.aq=e.target.value;render();const i=$('#aq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}return}
+  if(e.target.id==='cq'){S.cq=e.target.value;render();const i=$('#cq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}return}
   if(e.target.id==='tq'){S.q=e.target.value;render();const i=$('#tq');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}return}
   if(e.target.closest('#u-items,#u-title,#u-game'))buildUpdate()});
 boot();

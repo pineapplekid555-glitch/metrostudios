@@ -110,6 +110,29 @@
       }
       el.innerHTML = html;
     },
+    'news-archive': function (el) {
+      var want = (new URLSearchParams(location.search).get('game') || '').trim(), all = news(''), list = want ? all.filter(function (n) { return str(n.game) === want; }) : all;
+      var pills = [['', 'All']].concat(Object.keys(GAME_NAME).map(function (k) { return [k, GAME_NAME[k]]; })).filter(function (p) { return !p[0] || all.some(function (n) { return str(n.game) === p[0]; }); });
+      var head = pills.length > 2 ? '<div class="pillrow">' + pills.map(function (p) {
+        return '<a class="pill" href="' + (PREVIEW ? '#' : '?' + (p[0] ? 'game=' + p[0] : '')) + '"' + (p[0] === want ? ' aria-current="true"' : '') + '>' + esc(p[1]) + '</a>';
+      }).join('') + '</div>' : '';
+      el.innerHTML = head + (list.length ? list.map(function (n) {
+        var g = GAME_NAME[str(n.game)];
+        return '<article class="arch rv">' + (g ? '<span class="n-game">' + esc(g) + '</span>' : '<span class="n-game">Studio</span>') + updateBlock(n, '') + '</article>';
+      }).join('') : '<p class="note" style="margin:0">No news yet.</p>');
+    },
+    'faq': function (el) {
+      var list = arr(S.faq).filter(function (f) { return f && str(f.q) && str(f.a); });
+      if (!list.length) { el.innerHTML = ''; hideSection(el, true); return; }
+      hideSection(el, false);
+      el.innerHTML = '<div class="faqs">' + list.map(function (f) {
+        return '<details class="faq rv"><summary>' + esc(str(f.q)) + '</summary><p>' + esc(str(f.a)) + '</p></details>';
+      }).join('') + '</div>';
+      var old = document.getElementById('faq-ld'); if (old) old.remove();
+      var ld = document.createElement('script'); ld.type = 'application/ld+json'; ld.id = 'faq-ld';
+      ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: list.map(function (f) { return { '@type': 'Question', name: str(f.q), acceptedAnswer: { '@type': 'Answer', text: str(f.a) } }; }) });
+      document.head.appendChild(ld);
+    },
     'news-home': function (el) {
       var limit = +el.getAttribute('data-limit') || 3, list = news('').slice(0, limit);
       if (!list.length) { el.innerHTML = ''; hideSection(el, true); return; }
@@ -162,6 +185,15 @@
         try { fn(el); } catch (err) { if (window.console) console.warn('[Metro Studios] content.js problem near ' + sel + ':', err); }
       });
     }
+    (function banner() {
+      var b = S.banner || {}, t = str(b.text), site = document.querySelector('.site'), ex = document.getElementById('ms-banner');
+      if (ex) ex.remove();
+      if (!t || !site || PREVIEW) return;
+      var u = link(b.link), d = document.createElement('div');
+      d.className = 'banner'; d.id = 'ms-banner'; d.setAttribute('role', 'status');
+      d.innerHTML = '<span>' + esc(t) + '</span>' + (u ? '<a href="' + esc(u) + '">' + esc(str(b.linkText) || 'Read more') + '</a>' : '');
+      site.insertBefore(d, site.firstChild);
+    })();
     each('[data-render]', function (el) { var f = R[el.getAttribute('data-render')]; if (f) f(el); });
     each('[data-link]', function (el) {
       var u = link(S.links && S.links[el.getAttribute('data-link')]);
@@ -228,6 +260,42 @@
     addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
   }
   window.MS_closeMenu = closeMenu;
+
+  /* ---- skip link, back to top ---- */
+  (function () {
+    var main = document.querySelector('main');
+    if (main) {
+      main.id = main.id || 'main';
+      var sk = document.createElement('a'); sk.className = 'skip'; sk.href = '#' + main.id; sk.textContent = 'Skip to content';
+      document.body.insertBefore(sk, document.body.firstChild);
+    }
+    var up = document.createElement('button');
+    up.className = 'to-top'; up.type = 'button'; up.setAttribute('aria-label', 'Back to top'); up.hidden = true;
+    up.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><path d="M8 14V3M4 7l4-4 4 4"/></svg>';
+    up.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); });
+    document.body.appendChild(up);
+    addEventListener('scroll', function () { up.hidden = (window.scrollY || 0) < 900; }, { passive: true });
+  })();
+
+  /* ---- join form ---- */
+  (function () {
+    var f = document.getElementById('joinForm'); if (!f) return;
+    var msg = document.getElementById('joinMsg'), btn = f.querySelector('button[type=submit]');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var d = {}; new FormData(f).forEach(function (v, k) { d[k] = v; });
+      msg.className = 'form-msg'; msg.textContent = 'Sending…'; btn.disabled = true;
+      fetch(ROOT + 'api/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j, status: r.status }; }); })
+        .then(function (r) {
+          if (r.ok) { f.hidden = true; var ok = document.getElementById('joinDone'); ok.hidden = false; ok.focus(); return; }
+          btn.disabled = false; msg.className = 'form-msg bad';
+          msg.textContent = r.j.error || (r.status === 404 || r.status === 405 ? 'The application form is not available on this version of the site yet.' : 'Something went wrong. Please try again.');
+        })
+        .catch(function () { btn.disabled = false; msg.className = 'form-msg bad'; msg.textContent = 'Could not reach the server. Check your connection and try again.'; });
+    });
+  })();
+
 
   /* ---- buttons that scroll to a section on the current page ---- */
   function scrollToId(id) {

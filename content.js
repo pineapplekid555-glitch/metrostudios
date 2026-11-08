@@ -73,6 +73,29 @@ window.SITE = {
   },
 
 
+  /* ----------------------------------------------------------------- BANNER
+     A thin bar across the top of every page, for announcements such as
+     "Westbrook County update is live". Leave text as "" to hide the bar.
+     link and linkText are optional (a button-style link at the end).        */
+  banner: {
+    text: "",
+    link: "",
+    linkText: "Read more"
+  },
+
+
+  /* -------------------------------------------------------------------- FAQ
+     Questions shown at the bottom of the About page. One block per question.
+     Delete a block to remove it, or copy one to add another.                */
+  faq: [
+    { q: "How do I play Westbrook County?", a: "Westbrook County is out now on Roblox. Use the Play button at the top of any page to open it." },
+    { q: "Where can I talk to the team and other players?", a: "Join the Discord using the link in the footer of any page. It is the best place to ask questions and follow updates." },
+    { q: "How do I join the team?", a: "Open the Join page and send an application. We are looking for scripters, builders, modellers and UI designers, and we read every application." },
+    { q: "When are Project Alba and Oath of Caledonia coming out?", a: "Both are in development and have no release date yet. News and screenshots will be posted here as they take shape." },
+    { q: "Is Metro Studios part of Roblox?", a: "No. Metro Studios is an independent development group and is not affiliated with or endorsed by Roblox Corporation." }
+  ],
+
+
   /* ------------------------------------------------------------------- NEWS
      One block per post. Newest posts show first whatever order you write them in.
      date:  year-month-day, e.g. "2026-10-12"

@@ -213,6 +213,34 @@ async function handle({ request, env }) {
     return new Response(null, { status: 302, headers: { Location: "/staff/", "Set-Cookie": cookie("ms_session", "", 0) } });
   }
 
+  // ---- Public: staff application form (no login needed) ----
+  if (a === "apply" && method === "POST") {
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const rk = "rl:apply:" + String(await sign(env, ip)).slice(0, 24);
+    const used = parseInt((await env.STAFF.get(rk)) || "0", 10);
+    if (used >= 3) return fail("You have already sent a few applications. Please try again in an hour.", 429);
+    const input = await request.json().catch(() => null);
+    if (!input || typeof input !== "object") return fail("Something went wrong. Please try again.");
+    if (input.website) return json({ ok: true }); // hidden field: only bots fill it in
+    const app = {
+      discord: clip(input.discord, 60), roblox: clip(input.roblox, 40).replace(/^@/, ""), role: clip(input.role, 40), game: clip(input.game, 40),
+      experience: clip(input.experience, 2000), portfolio: clip(input.portfolio, 300), why: clip(input.why, 2000)
+    };
+    if (!app.discord) return fail("Enter your Discord username.");
+    if (!app.roblox) return fail("Enter your Roblox username.");
+    if (!app.role) return fail("Choose what you would like to do.");
+    if (app.experience.length < 20) return fail("Tell us a little more about your experience (at least a sentence).");
+    if (app.why.length < 10) return fail("Tell us why you would like to join.");
+    if (app.portfolio && !/^https?:\/\/\S+$/i.test(app.portfolio)) return fail("The portfolio link must start with http:// or https://.");
+    const existing = await env.STAFF.list({ prefix: "app:", limit: 1000 });
+    if (existing.keys.length >= 500) return fail("Applications are paused right now. Please ask in the Discord.", 503);
+    const rec = { id: crypto.randomUUID(), created: Date.now(), status: "new", note: "", ...app };
+    await env.STAFF.put("app:" + rec.id, JSON.stringify(rec));
+    await env.STAFF.put(rk, String(used + 1), { expirationTtl: 3600 });
+    await notify(env, "📝 New staff application: **" + app.discord + "** (" + app.role + ", " + (app.game || "any game") + "). Review it in the staff area.");
+    return json({ ok: true });
+  }
+
   // ---- Everything below needs a session ----
   const uid = await readSession(env, request);
   if (!uid) return fail("Not logged in.", 401);
@@ -381,6 +409,21 @@ async function handle({ request, env }) {
   }
 
   // ---- Marketing campaign claims with proof ----
+  // ---- Applications (owner only) ----
+  if (a === "applications") {
+    if (!owner) return fail("Owner only.", 403);
+    if (method === "GET") return json({ applications: (await listAll(env, "app:")).sort((x, y) => y.created - x.created) });
+    const rec = JSON.parse((await env.STAFF.get("app:" + b)) || "null");
+    if (!rec) return fail("Not found.", 404);
+    if (method === "DELETE") { await env.STAFF.delete("app:" + rec.id); return json({ ok: true }); }
+    if (method === "PATCH") {
+      if (["new", "reviewing", "accepted", "declined"].includes(body.status)) rec.status = body.status;
+      if ("note" in body) rec.note = clip(body.note, 500);
+      await env.STAFF.put("app:" + rec.id, JSON.stringify(rec));
+      return json(rec);
+    }
+  }
+
   if (a === "campaigns") {
     if (method === "GET") {
       const all = (await listAll(env, "camp:")).filter(x => owner || x.by === uid).sort((x, y) => y.created - x.created);

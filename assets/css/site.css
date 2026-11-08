@@ -394,3 +394,29 @@ a.n-row:hover>svg{transform:translateX(5px);color:var(--text)}
   .link,.prose a{padding:4px 0}
   .btn{min-height:48px}
 }
+
+/* ---- skip link, banner, back to top ---- */
+.skip{position:absolute;left:12px;top:-64px;z-index:200;background:var(--text);color:var(--ink);padding:10px 16px;font-weight:600;border-radius:2px;text-decoration:none}.skip:focus{top:12px}
+.banner{position:relative;z-index:60;background:var(--paper);color:var(--paper-ink);text-align:center;padding:11px var(--gut);font-size:15px;font-weight:500;line-height:1.4}
+.banner a{color:inherit;font-weight:700;margin-left:12px;text-underline-offset:.2em;white-space:nowrap}
+.to-top{position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:40;width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line);background:rgba(17,17,19,.9);color:var(--text);display:grid;place-items:center;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.to-top[hidden]{display:none}.to-top:hover{border-color:var(--text)}.to-top svg{width:18px;height:18px}
+/* ---- news archive and FAQ ---- */
+.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:clamp(28px,4vw,48px)}
+.pill{padding:9px 18px;border:1.5px solid var(--line);border-radius:99px;color:var(--text-2);text-decoration:none;font-weight:600;font-size:15px;transition:border-color .2s,color .2s,background .2s}
+.pill:hover{border-color:var(--text);color:var(--text)}.pill[aria-current=true]{background:var(--text);border-color:var(--text);color:var(--ink)}
+.arch{padding-block:clamp(26px,3.4vw,44px);border-top:1px solid var(--rule)}.arch:first-of-type{border-top:0;padding-top:0}.arch>.n-game{display:inline-block;margin-bottom:12px}
+.faqs{border-top:1px solid var(--rule);max-width:880px}
+.faq{border-bottom:1px solid var(--rule)}.faq summary{display:flex;align-items:center;gap:16px;padding:22px 0;font-weight:600;font-size:1.08rem;cursor:pointer;list-style:none}
+.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";margin-left:auto;font-size:1.6rem;line-height:1;color:var(--muted)}.faq[open] summary::after{content:"\2212"}
+.faq p{margin:0 0 24px;color:var(--text-2);max-width:42em}
+/* ---- join form ---- */
+.apply{display:grid;gap:22px;max-width:760px}
+.apply .two{display:grid;gap:22px;grid-template-columns:1fr 1fr}
+.apply label{display:grid;gap:8px;font-weight:600;font-size:15px}.apply label small{font-weight:400;color:var(--muted);font-size:13.5px}
+.apply input,.apply select,.apply textarea{width:100%;padding:14px 16px;background:var(--ink-2);color:var(--text);border:1.5px solid var(--line);border-radius:2px;font:400 16px/1.4 var(--main)}
+.apply textarea{min-height:140px;resize:vertical}.apply input:focus,.apply select:focus,.apply textarea:focus{outline:0;border-color:var(--text)}
+.apply .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.apply .fine{color:var(--muted);font-size:14px;margin:0}.form-msg{min-height:1.4em;margin:0;color:var(--text-2)}.form-msg.bad{color:#ff7b72;font-weight:600}
+.done{max-width:640px;padding:28px;border:1.5px solid var(--text);outline:0}.done h2{margin:0 0 10px}.done p{margin:0;color:var(--text-2)}
+@media(max-width:640px){.apply .two{grid-template-columns:1fr}.banner a{display:block;margin:6px 0 0}}

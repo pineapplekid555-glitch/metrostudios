@@ -117,3 +117,11 @@ About text) is in each page's `index.html`. You can edit those directly, or ask 
   ignored silently by the site but flagged there.
 * **The whole file is broken:** the site keeps showing the last saved version of each page until you fix
   it, so visitors never see a blank page. `/content-check/` shows the line number.
+
+## Banner, FAQ, News page and applications
+
+- **Banner:** in `content.js`, fill in `banner.text` to show a thin bar across the top of every page (add `link` for a button). Set `text` back to `""` to hide it.
+- **FAQ:** the questions at the bottom of the About page come from the `faq` list in `content.js`. Edit, delete or copy blocks as you like.
+- **News page (`/news/`):** shows every post from the `news` list, with filters per game. Nothing extra to edit.
+- **Join page (`/join/`):** applicants fill in a form. You review them in the staff area under **Applications** (owner only).
+- **Search and social previews:** page links on Discord, Google and social media use `https://metrostudios.pages.dev`. If you move to your own domain, search all files for `metrostudios.pages.dev` and replace it with the new address (this includes `sitemap.xml` and `robots.txt`).
