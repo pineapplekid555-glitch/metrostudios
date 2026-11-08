@@ -129,7 +129,7 @@ async function payouts(env) {
     ...camps.map(x => ({ kind: "campaign", id: x.id, what: "Campaign: " + x.title, by: x.by, status: x.status, amount: x.amount || 0, at: x.created || 0, paidAt: x.paidAt || 0 }))
   ];
   const claimers = new Set(items.map(i => i.by));
-  return users.filter(u => u.id !== env.OWNER_DISCORD_ID && (u.roles.length || u.games.length || claimers.has(u.id))).map(u => {
+  return users.filter(u => u.id === env.OWNER_DISCORD_ID ? claimers.has(u.id) : (u.roles.length || u.games.length || claimers.has(u.id))).map(u => {
     const mine = items.filter(x => x.by === u.id && x.status !== "rejected").sort((x, y) => y.at - x.at);
     const sum = st => mine.filter(x => x.status === st).reduce((n, x) => n + (x.amount || 0), 0);
     return { id: u.id, name: u.name, roblox: u.roblox || "", rates: { tiktok: u.rates?.tiktok ?? null, campaign: u.rates?.campaign ?? null }, pending: sum("pending"), owed: sum("approved"), paid: sum("paid"), lastPaid: Math.max(0, ...mine.map(x => x.paidAt || 0)), items: mine };
