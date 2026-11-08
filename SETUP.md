@@ -51,3 +51,9 @@ random string), then have your tool send a POST request to:
 Tools such as Zapier, Make or IFTTT can do this if they offer a trigger for your TikTok account. Until that is set
 up, the owner, leads and Marketing staff can paste a link with the **Add TikTok** box. The site fetches the title and
 thumbnail from TikTok automatically.
+
+## Optional: get a Discord message when staff claim something
+
+1. In Discord, open a private channel for yourself → **Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL**.
+2. In Cloudflare, open your Pages project → **Settings → Variables and Secrets** and add a secret named `NOTIFY_WEBHOOK` with that URL.
+3. Redeploy. From then on a message appears whenever someone claims a TikTok or a campaign. It never pings anyone.

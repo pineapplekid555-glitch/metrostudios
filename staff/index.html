@@ -67,6 +67,9 @@ form[data-form=camp] .cf{margin-top:8px}form[data-form=camp] .cf-chk{display:non
 form[data-form=camp][data-t=other] .cf-dm,form[data-form=camp][data-t=other] .cf-server,form[data-form=camp][data-t=dm] .cf-server,form[data-form=camp][data-t=dm] .cf-other,form[data-form=camp][data-t=server] .cf-dm,form[data-form=camp][data-t=server] .cf-other{display:none}
 form[data-form=camp][data-t=dm] .cf-chk,form[data-form=camp][data-t=server] .cf-chk{display:block}
 .pill{position:relative}#dupres.bad{color:#e5484d;font-weight:600}#dupres.ok{color:var(--grn);font-weight:600}
+.nb{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:99px;background:var(--amb);color:#000;font-size:11px;font-weight:700;line-height:16px;text-align:center}
+.todo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.todo:last-child{border:0}.todo b{font-size:1.1rem}
+.ok{color:var(--grn)}
 .empty{text-align:center;padding:40px 10px;color:var(--mut)}
 html{-webkit-text-size-adjust:100%}.tc{position:relative}.mobl{display:none}
 nav.tabs{scrollbar-width:none;-webkit-overflow-scrolling:touch}nav.tabs::-webkit-scrollbar{display:none}
@@ -129,17 +132,34 @@ async function act(fn){try{S.err='';await fn();await load()}catch(e){S.err=e.mes
 function render(){
   const tabs=[['home','Home'],['tasks','Tasks'],['bugs','Bugs'],['tiktoks','TikToks']];if(S.me.marketing)tabs.push(['marketing','Marketing']);tabs.push(['pay','Payments'],['links','Links'],['tools','Update writer']);
   if(S.me.owner)tabs.push(['admin','Admin']);else if(S.me.lead)tabs.push(['admin','My team']);
+  const owe=S.me.owner?(S.pay||[]).filter(u=>u.owed||u.pending).length:0,bdg={tiktoks:S.me.owner?S.tt.filter(t=>t.claim&&t.claim.status==='pending').length:0,marketing:S.me.owner?S.camps.filter(c=>c.status==='pending').length:0,pay:owe};
   const body={home,tasks:()=>board('task'),bugs:()=>board('bug'),tiktoks,marketing,pay,links,tools,admin}[S.tab]();
   $('#app').innerHTML=`<h1>Hello, ${esc(S.me.name)}</h1><div class="mut">${S.me.owner?'Owner':S.me.games.map(gname).join(', ')}${S.me.roles.length?' · '+S.me.roles.map(rname).join(', '):''}</div>
-  <nav class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${k===S.tab}" data-tab="${k}">${l}</button>`).join('')}</nav>
+  <nav class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${k===S.tab}" data-tab="${k}">${l}${bdg[k]?`<span class="nb">${bdg[k]}</span>`:''}</button>`).join('')}</nav>
   ${S.err?`<p class="err">${esc(S.err)}</p>`:''}${body}`}
+
+function attention(){
+  const me=S.me,rows=[];
+  if(me.owner){
+    const pt=S.tt.filter(t=>t.claim&&t.claim.status==='pending').length,pc=S.camps.filter(c=>c.status==='pending').length,owed=(S.pay||[]).reduce((n,u)=>n+u.owed,0),ow=(S.pay||[]).filter(u=>u.owed>0).length,un=S.tt.filter(t=>!t.claim).length;
+    if(pt)rows.push([pt,'TikTok claims waiting for approval','tiktoks','Review']);
+    if(pc)rows.push([pc,'Campaign claims waiting for approval','marketing','Review']);
+    if(ow)rows.push([rbx(owed),`owed to ${ow} ${ow===1?'person':'people'}`,'pay','Pay']);
+    if(un)rows.push([un,'TikToks nobody has claimed yet','tiktoks','View']);
+  }else if(me.roles.includes('marketing')){
+    const un=S.tt.filter(t=>!t.claim).length,mine=S.tt.filter(t=>t.claim&&t.claim.by===me.id);
+    const ow=[...mine.filter(t=>t.claim.status==='approved').map(t=>t.claim.amount),...S.camps.filter(c=>c.by===me.id&&c.status==='approved').map(c=>c.amount)].reduce((n,x)=>n+(x||0),0);
+    if(un)rows.push([un,'TikToks you can claim','tiktoks','Claim']);
+    if(ow)rows.push([rbx(ow),'approved and waiting to be paid to you','pay','View']);
+  }else return '';
+  return `<div class="card"><h2>${me.owner?'Needs your attention':'For you'}</h2>${rows.length?rows.map(([n,l,tab,b])=>`<div class="todo"><span><b>${n}</b> <span class="mut">${l}</span></span><button class="btn line sm" data-tab="${tab}">${b}</button></div>`).join(''):'<p class="ok" style="margin:0">All clear. Nothing is waiting on you.</p>'}</div>`}
 
 function home(){
   const mine=S.d.items.filter(i=>i.status!=='done'&&i.assignee&&i.assignee.toLowerCase()===S.me.name.toLowerCase());
   const open=S.d.items.filter(i=>i.status!=='done');
   const mgr=S.me.owner||S.me.lead,gSel=S.me.owner?`<option value="">${'Whole studio'}</option>`+S.cfg.games.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join(''):gOpts('');
   const ownerForm=mgr?`<form class="row" data-form="ann" style="margin-top:12px"><input class="grow" name="title" placeholder="Announcement title" required><select name="game">${gSel}</select><textarea name="text" placeholder="Message"></textarea><button class="btn">Post</button></form>`:'';
-  return `<div class="grid"><div class="card"><h2>Your work</h2>${mine.length?mine.map(i=>`<div class="it ${i.priority}"><span class="t">${esc(i.title)}</span><br><span class="tag">${esc(gname(i.game))}</span><span class="tag">${i.status}</span></div>`).join(''):'<p class="mut">Nothing assigned to you. Items assigned to your Discord display name show here.</p>'}</div>
+  return attention()+`<div class="grid"><div class="card"><h2>Your work</h2>${mine.length?mine.map(i=>`<div class="it ${i.priority}"><span class="t">${esc(i.title)}</span><br><span class="tag">${esc(gname(i.game))}</span><span class="tag">${i.status}</span></div>`).join(''):'<p class="mut">Nothing assigned to you. Items assigned to your Discord display name show here.</p>'}</div>
   <div class="card"><h2>Studio snapshot</h2>${S.me.games.map(g=>{const x=S.d.items.filter(i=>i.game===g);const o=x.filter(i=>i.status!=='done');return `<p><b>${esc(gname(g))}</b><br><span class="mut">${o.filter(i=>i.type==='task').length} open tasks · ${o.filter(i=>i.type==='bug').length} open bugs · ${x.length-o.length} done</span></p>`}).join('')}
   <p class="mut">Team: ${S.d.people.length} staff</p></div></div>
   <div class="card"><h2>Announcements</h2>${S.d.announcements.map(a=>`<div class="ann"><b>${esc(a.title)}</b> <span class="tag">${esc(gname(a.game))}</span><span class="mut"> ${date(a.created)}</span>${(S.me.owner||S.me.lead)?` <button class="btn del sm" data-del="announcements/${a.id}">Delete</button>`:''}<p>${esc(a.text)}</p></div>`).join('')||'<p class="mut">No announcements yet.</p>'}${ownerForm}</div>`}
@@ -219,9 +239,19 @@ function marketing(){
   <textarea name="links" placeholder="Proof links, one per line (optional if you attach screenshots)"></textarea>
   <div class="row" style="margin-top:8px"><input type="file" name="proofs" accept="image/*" multiple><span class="mut">Up to 4 screenshots</span><button class="btn">Submit claim</button></div></form></div>
   <div class="pills">${[['all','All'],['dm','DM adverts'],['server','Server adverts'],['other','Other']].map(([k,l])=>`<button class="pill" aria-pressed="${(S.cf||'all')===k}" data-cf="${k}">${l}<i>${cnt(k)}</i></button>`).join('')}</div>
-  <div class="tools"><input id="cq" class="search" type="search" placeholder="Search by username, server, invite or person" value="${esc(S.cq||'')}"></div>
+  <div class="tools"><input id="cq" class="search" type="search" placeholder="Search by username, server, invite or person" value="${esc(S.cq||'')}">${S.me.owner&&S.camps.some(c=>c.status==='pending')?`<button class="btn sm" data-appcamps="1" data-confirm="Approve all ${S.camps.filter(c=>c.status==='pending').length} pending campaign claims?">Approve all pending (${S.camps.filter(c=>c.status==='pending').length})</button>`:''}</div>
   ${list.map(campCard).join('')||'<p class="mut">No campaign claims yet.</p>'}`}
 
+function payHistory(){
+  const all=S.pay.flatMap(u=>u.items.map(i=>({...i,who:u.name,rbx:u.roblox}))),paid=all.filter(i=>i.status==='paid').sort((a,b)=>(b.paidAt||0)-(a.paidAt||0)),shown=S.hall?paid:paid.slice(0,15);
+  return `<div class="card"><h2>Payment history</h2><div class="tools"><button class="btn line sm" data-csv="1">Download spreadsheet (CSV)</button></div>
+  ${shown.map(i=>`<div class="li"><span><b>${esc(i.who)}</b> <span class="mut">${esc(i.what)}</span><br><span class="mut">${i.paidAt?date(i.paidAt):'date not recorded'}</span></span><b>${rbx(i.amount)}</b></div>`).join('')||'<p class="mut">Nothing has been paid yet.</p>'}
+  ${paid.length>15?`<button class="btn line sm" data-hall="1" style="margin-top:8px">${S.hall?'Show fewer':'Show all '+paid.length}</button>`:''}</div>`}
+function downloadCsv(){
+  const q=v=>{v=String(v??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'},d=t=>t?new Date(t).toISOString().slice(0,10):'';
+  const rows=[['Date paid','Status','Person','Roblox username','Type','Item','Robux']];
+  S.pay.forEach(u=>u.items.forEach(i=>rows.push([d(i.paidAt),i.status,u.name,u.roblox,i.kind,i.what,i.amount])));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv'}));a.download='metro-studios-payments-'+d(Date.now())+'.csv';document.body.appendChild(a);a.click();a.remove()}
 function payCards(){
   const P=[...S.pay].sort((a,b)=>b.owed-a.owed||b.pending-a.pending),due=P.filter(u=>u.owed>0),sm=k=>P.reduce((n,u)=>n+u[k],0);
   S.paylist=due.map(u=>`${u.name}${u.roblox?' (@'+u.roblox+')':''}: ${rbx(u.owed)}`).join('\n');
@@ -238,7 +268,7 @@ function pay(){
   let h=`<div class="grid"><div class="card"><h2>Your earnings</h2><p><b>${rbx(sum('approved'))}</b> owed to you<br><span class="mut">${rbx(sum('pending'))} waiting for approval · ${rbx(sum('paid'))} paid so far</span></p>
   <form class="row" data-form="profile"><input class="grow" name="roblox" placeholder="Your Roblox username (for payment)" value="${esc(S.me.roblox)}" maxlength="20"><button class="btn sm">Save</button></form></div>
   <div class="card"><h2>Your claims</h2>${mine.map(x=>`<div class="ann"><b>${esc(x.what)}</b> ${stTag(x.status)}<span class="tag">${rbx(x.amount)}</span></div>`).join('')||'<p class="mut">Nothing claimed yet.</p>'}</div></div>`;
-  if(S.me.owner)h=payCards()+h;
+  if(S.me.owner)h=payCards()+payHistory()+h;
   if(S.me.owner)h+=`<div class="card"><h2>Pay rates (Robux)</h2><p class="mut">Default amount per approved item. You can override it for each person below, or change one claim's amount when you approve it. The amount is fixed when a claim is made.</p>
   <form class="row" data-form="rates"><label>Per TikTok <input name="tiktok" type="number" min="0" value="${S.cfg.rates.tiktok}" style="width:100px"></label><label>Per campaign <input name="campaign" type="number" min="0" value="${S.cfg.rates.campaign}" style="width:100px"></label><button class="btn sm">Save defaults</button></form></div>
   <div class="card"><h2>Custom rate per person</h2><table><tr><th>Person</th><th>TikTok rate</th><th>Campaign rate</th></tr>
@@ -273,13 +303,16 @@ function admin(){
   <td><button class="btn del sm" data-del="users/${u.id}" data-confirm="Remove ${esc(u.name)}?">Remove</button></td></tr>`).join('')}</table></div>`}
 
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall],[data-appperson],[data-copypay],[data-copytext],[data-watch],[data-refresh],[data-setall],[data-cf],[data-checkdup]');if(!t)return;
+  const t=e.target.closest('[data-tab],[data-del],[data-move],[data-copy],[data-claim],[data-decide],[data-payall],[data-sync],[data-ttf],[data-selall],[data-clearsel],[data-claimsel],[data-apprall],[data-appperson],[data-copypay],[data-copytext],[data-watch],[data-refresh],[data-setall],[data-cf],[data-checkdup],[data-csv],[data-hall],[data-appcamps]');if(!t)return;
   if(t.dataset.tab){e.preventDefault();S.tab=t.dataset.tab;S.err='';render()}
   else if(t.dataset.del){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(async()=>{const r=await api(t.dataset.del,'DELETE');if(r.games&&r.roles)S.cfg=r})}
   else if(t.dataset.move){const[id,st]=t.dataset.move.split(':');act(()=>api('items/'+id,'PATCH',{status:st}))}
   else if(t.dataset.claim){act(()=>api('tiktoks/'+t.dataset.claim+'/claim','POST',{}))}
   else if(t.dataset.decide){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;const[kind,id,action]=t.dataset.decide.split(':'),b={action,amount:$('#amt-'+id)?.value};if($('#note-'+id))b.note=$('#note-'+id).value;act(()=>api(kind+'/'+id,'PATCH',b))}
   else if(t.dataset.payall){if(t.dataset.confirm&&!confirm(t.dataset.confirm))return;act(()=>api('payouts','POST',{user:t.dataset.payall}))}
+  else if(t.dataset.csv){downloadCsv()}
+  else if(t.dataset.hall){S.hall=!S.hall;render()}
+  else if(t.dataset.appcamps){if(!confirm(t.dataset.confirm))return;act(async()=>{for(const c of S.camps.filter(c=>c.status==='pending')){try{await api('campaigns/'+c.id,'PATCH',{action:'approve'})}catch(e){}}})}
   else if(t.dataset.cf){S.cf=t.dataset.cf;render()}
   else if(t.dataset.checkdup){const f=t.closest('form'),b=Object.fromEntries(new FormData(f)),o=$('#dupres');o.className='mut';o.textContent='Checking…';
     api('campaigns/check','POST',{type:b.ctype,username:b.username,serverName:b.serverName,invite:b.invite}).then(r=>{o.className=r.duplicate?'bad':'ok';o.textContent=r.duplicate?r.message:'Not claimed yet. You are good to go.'}).catch(x=>{o.className='bad';o.textContent=x.message})}

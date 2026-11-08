@@ -113,6 +113,15 @@ function campTarget(body) {
   return c;
 }
 
+// Optional: set a NOTIFY_WEBHOOK secret (a Discord channel webhook URL) to get a message when staff submit claims.
+async function notify(env, text) {
+  const u = String(env.NOTIFY_WEBHOOK || "");
+  if (!/^https:\/\/(?:discord|discordapp)\.com\/api\/webhooks\//.test(u)) return;
+  try {
+    await fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: String(text).slice(0, 1800), allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(3000) });
+  } catch {}
+}
+
 async function payouts(env) {
   const [tts, camps, users] = await Promise.all([listAll(env, "tt:"), listAll(env, "camp:"), listAll(env, "user:")]);
   const items = [
@@ -351,6 +360,7 @@ async function handle({ request, env }) {
       if (!marketing) return fail("Only marketing staff can claim TikToks.", 403);
       if (t.claim) return fail("Already claimed by " + t.claim.name + ".");
       t.claim = { by: uid, name: me.name, at: Date.now(), amount: rateFor(me, "tiktok"), status: "pending" };
+      await notify(env, "🎵 **" + me.name + "** claimed a TikTok (R$" + t.claim.amount + "): " + t.url);
       return save();
     }
     if (c === "claim" && method === "DELETE") {
@@ -403,6 +413,7 @@ async function handle({ request, env }) {
       for (const d of imgs) { const pid = crypto.randomUUID(); await env.STAFF.put("proof:" + pid, JSON.stringify({ by: uid, data: d })); proofs.push(pid); }
       const rec = { id: crypto.randomUUID(), by: uid, name: me.name, title, description: clip(body.description, 2000), links, proofs, amount: rateFor(me, "campaign"), status: "pending", note: "", created: Date.now(), ...t };
       await env.STAFF.put("camp:" + rec.id, JSON.stringify(rec));
+      await notify(env, "📣 **" + me.name + "** claimed a campaign (R$" + rec.amount + "): " + rec.title);
       return json(rec);
     }
     const rec = JSON.parse((await env.STAFF.get("camp:" + b)) || "null");
