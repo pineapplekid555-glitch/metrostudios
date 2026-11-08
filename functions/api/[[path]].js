@@ -80,6 +80,39 @@ async function addTikTok(env, raw, source, by, extra = {}) {
   return { rec };
 }
 
+// Ad campaigns: "dm" (a successful DM advert), "server" (a successful server advert) or "other".
+const CAMP_TYPES = ["dm", "server", "other"];
+const userKey = v => String(v || "").trim().replace(/^@/, "").replace(/\s+/g, "").toLowerCase().slice(0, 40);
+const nameKey = v => String(v || "").trim().replace(/\s+/g, " ").toLowerCase().slice(0, 80);
+// Accepts a bare code or any discord.gg / discord.com/invite link and returns just the lower-case code.
+const codeKey = v => {
+  const t = String(v || "").trim();
+  const m = t.match(/(?:discord\.gg|discord(?:app)?\.com\/invite)\/([A-Za-z0-9-]{2,40})/i);
+  if (m) return m[1].toLowerCase();
+  return /^[A-Za-z0-9-]{2,40}$/.test(t) ? t.toLowerCase() : "";
+};
+// Returns the earlier claim (if any) that has already logged this DM target or server. Rejected claims do not count.
+async function findDuplicate(env, c) {
+  if (c.type !== "dm" && c.type !== "server") return null;
+  for (const x of await listAll(env, "camp:")) {
+    if (x.status === "rejected" || x.type !== c.type) continue;
+    if (c.type === "dm" ? (c.userKey && x.userKey === c.userKey) : ((c.code && x.code === c.code) || (c.nameKey && x.nameKey === c.nameKey))) return x;
+  }
+  return null;
+}
+const dupMsg = (x, what) => what + " has already been claimed by " + x.name + " on " + new Date(x.created).toLocaleDateString("en-GB") + (x.status === "paid" ? " (paid)" : x.status === "approved" ? " (approved)" : " (waiting for approval)") + ".";
+function campTarget(body) {
+  const type = CAMP_TYPES.includes(body.type) ? body.type : "other";
+  const c = { type };
+  if (type === "dm") { c.target = clip(body.username, 40).replace(/^@/, "").trim(); c.userKey = userKey(c.target); }
+  if (type === "server") {
+    c.serverName = clip(body.serverName, 80).trim(); c.nameKey = nameKey(c.serverName);
+    c.invite = clip(body.invite, 120).trim(); c.code = codeKey(c.invite);
+    c.target = c.serverName || c.code;
+  }
+  return c;
+}
+
 async function payouts(env) {
   const [tts, camps, users] = await Promise.all([listAll(env, "tt:"), listAll(env, "camp:"), listAll(env, "user:")]);
   const items = [
@@ -343,9 +376,22 @@ async function handle({ request, env }) {
       const all = (await listAll(env, "camp:")).filter(x => owner || x.by === uid).sort((x, y) => y.created - x.created);
       return json({ campaigns: all });
     }
+    // Staff can check whether a DM target or server has already been claimed before they spend time on it.
+    if (b === "check" && method === "POST") {
+      if (!marketing) return fail("Only marketing staff can claim campaigns.", 403);
+      const t = campTarget(body);
+      const d = await findDuplicate(env, t);
+      return json({ duplicate: !!d, message: d ? dupMsg(d, t.type === "dm" ? "@" + t.target : t.target || "That server") : "" });
+    }
     if (method === "POST") {
       if (!marketing) return fail("Only marketing staff can claim campaigns.", 403);
-      const title = clip(body.title, 120);
+      const t = campTarget(body);
+      if (t.type === "dm" && !t.userKey) return fail("Enter the username you sent the DM advert to.");
+      if (t.type === "server" && !t.nameKey && !t.code) return fail("Enter the server name and/or its invite code or link.");
+      if (t.invite && !t.code) return fail("That does not look like a Discord invite. Use the code (e.g. abc123) or a discord.gg link.");
+      const dup = await findDuplicate(env, t);
+      if (dup) return fail(dupMsg(dup, t.type === "dm" ? "@" + t.target : t.target), 409);
+      const title = t.type === "dm" ? "DM advert: " + t.target : t.type === "server" ? "Server advert: " + t.target : clip(body.title, 120);
       if (!title) return fail("Add a title.");
       const links = (Array.isArray(body.links) ? body.links : []).map(l => clip(l, 500)).filter(l => /^https?:\/\//i.test(l)).slice(0, 5);
       const imgs = (Array.isArray(body.proofs) ? body.proofs : []).slice(0, 4);
@@ -355,7 +401,7 @@ async function handle({ request, env }) {
       if (!links.length && !imgs.length) return fail("Attach proof: at least one screenshot or link.");
       const proofs = [];
       for (const d of imgs) { const pid = crypto.randomUUID(); await env.STAFF.put("proof:" + pid, JSON.stringify({ by: uid, data: d })); proofs.push(pid); }
-      const rec = { id: crypto.randomUUID(), by: uid, name: me.name, title, description: clip(body.description, 2000), links, proofs, amount: rateFor(me, "campaign"), status: "pending", note: "", created: Date.now() };
+      const rec = { id: crypto.randomUUID(), by: uid, name: me.name, title, description: clip(body.description, 2000), links, proofs, amount: rateFor(me, "campaign"), status: "pending", note: "", created: Date.now(), ...t };
       await env.STAFF.put("camp:" + rec.id, JSON.stringify(rec));
       return json(rec);
     }
