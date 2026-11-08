@@ -78,8 +78,8 @@ window.SITE = {
      "Westbrook County update is live". Leave text as "" to hide the bar.
      link and linkText are optional (a button-style link at the end).        */
   banner: {
-    text: "",
-    link: "",
+    text: "Westbrook County becomes available to all ages on 2 February 2027.",
+    link: "https://metrostudios.pages.dev/news/",
     linkText: "Read more"
   },
 
@@ -109,6 +109,12 @@ window.SITE = {
      To add a post, copy a whole { ... }, paste it above the others, change the
      words, and make sure there is a comma after its closing }.             */
   news: [
+    {
+      date: "2026-11-08",
+      game: "westbrook-county",
+      title: "Westbrook County opens to all ages on 2 February 2027",
+      text: "Westbrook County will become available to all ages on 2 February 2027."
+    },
     {
       date: "2026-10-12",
       game: "westbrook-county",
